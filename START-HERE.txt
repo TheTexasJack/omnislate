@@ -1,0 +1,277 @@
+==============================================================
+  OMNISLATE: START HERE
+==============================================================
+
+OMNISLATE makes a cockpit-style display for the game table:
+planet scans, a spinning globe, drone feeds, mission briefs,
+and GM-fired events like an attack.  You edit a few text
+files, press Build, and get one web page per game session.
+That page is what you open on the tablet or laptop.
+
+There are two ways to use it.  Pick one:
+
+  PATH A.  THE SERVER (unstableNHP)          most GMs
+           Any computer, Windows included.  Nothing to
+           install except Tailscale.  Nathan's server
+           builds for you.
+
+  PATH B.  A LINUX MINT LAPTOP                local only
+           The whole workshop on one machine, with a
+           Build icon on the desktop.  No network needed.
+           Windows would need Python and its add-ons
+           installed and kept up by hand, so Windows GMs
+           use Path A.
+
+
+==============================================================
+  PATH A.  THE SERVER (unstableNHP)
+==============================================================
+
+Ask Nathan for three things first:
+  - a Tailscale invite link
+  - your campaign folder name   (example: iron-tide)
+  - your password
+
+
+--------------------------------------------------------------
+  A1.  JOIN TAILSCALE (once per device)
+--------------------------------------------------------------
+
+Tailscale is a private network.  It lets your computer reach
+the server from anywhere, and nobody outside it can.
+
+  Windows, Mac, phone, or tablet:
+    1. Download Tailscale from  tailscale.com/download
+       and install it.
+    2. Open Nathan's invite link and sign in.
+    3. Windows shows a small Tailscale icon by the clock
+       when it is connected.
+
+  Linux Mint (in a terminal):
+    curl -fsSL https://tailscale.com/install.sh | sh
+    sudo tailscale up
+       It prints a link.  Open it and sign in.
+
+  Test it:  open a browser and go to
+    http://unstablenhp/
+  A login box means it works.  Log in with your name and
+  password, and bookmark the page.
+
+  Every device that opens session pages from the server
+  needs Tailscale too, the table tablet included.
+
+
+--------------------------------------------------------------
+  A2.  OPEN YOUR CAMPAIGN DRIVE (once)
+--------------------------------------------------------------
+
+Your campaign folder lives on the server.  Open it like a
+normal folder, then edit and drag files in.
+
+  Windows:
+    File Explorer, right-click "This PC", choose
+    "Map network drive", and use the folder:
+      \\unstablenhp\iron-tide       (your own folder name)
+    Tick "Connect using different credentials" and log in
+    with your name and password.
+
+  Linux Mint:
+    Open Files, press Ctrl + L, and type:
+      smb://unstablenhp/iron-tide   (your own folder name)
+    Log in with your name and password, pick "Remember
+    forever", then press Ctrl + D to bookmark it.
+
+  Step-by-step pictures in words: docs/GM_SERVER_GUIDE.md
+
+
+--------------------------------------------------------------
+  A3.  EDIT, BUILD, PLAY
+--------------------------------------------------------------
+
+  Edit:   open README.md in your campaign folder first.
+          It walks through every file.  Edit .md files
+          in Notepad or any text editor.
+
+  Build:  saved files rebuild by themselves about five
+          seconds later.  Or press Build on
+          http://unstablenhp/ and read the report.
+          Green is fine.  Amber "Warn" lines are small
+          data problems.  Red "FAILED" lines name the
+          file and line to fix.
+
+  Play:   session links on the build page are listed
+          under each chapter.  Click one to open it.
+
+  New chapter:  copy "_template" inside your campaign
+          folder and rename the copy (see "CHAPTERS"
+          below).
+
+Some folders are read-only on purpose (the engine and the
+finished pages in dist/).  README.md explains what is locked
+and why.
+
+
+==============================================================
+  PATH B.  A LINUX MINT LAPTOP
+==============================================================
+
+--------------------------------------------------------------
+  B1.  SEE IT WORKING (2 minutes)
+--------------------------------------------------------------
+
+Open this folder, then this file, by double-clicking:
+
+    dist/_starter/chapter-1/session-1.html
+
+It opens in Firefox.  Tap the screen to connect.  Look around
+the Scan, Briefs, and Deep Scan tabs.  Deep Scan has a list
+of every known world on the left.
+
+Now open the secret GM panel:
+    Hold your finger (or mouse button) on the round badge in
+    the top-left corner for about one second.
+    On a keyboard: Ctrl + Shift + G
+
+In the GM panel, pick "Station attack" and press "Fire now".
+That is what your players will see.  Press "Reset session"
+in the GM panel to put everything back.
+
+
+--------------------------------------------------------------
+  B2.  READ THESE, IN THIS ORDER
+--------------------------------------------------------------
+
+  1. campaigns/_starter/README.md
+       How to set up your own campaign, step by step.
+       This is the main guide.  Start here.
+
+  2. campaigns/_starter/campaign.md
+       Your campaign's name, crest, colors, and events.
+       Every line has a note explaining it.
+
+  3. campaigns/_starter/chapter-1/sessions/session-1.md
+       One game session.  The notes at the top explain
+       every line.
+
+  4. README.md  (this folder)
+       The bigger picture: folders, building, the tablet,
+       and every GM panel button.  Read it when you want
+       the details.
+
+  Everything ending in .md or .txt opens in any text editor.
+
+
+--------------------------------------------------------------
+  B3.  MAKE YOUR OWN CAMPAIGN
+--------------------------------------------------------------
+
+  1. Open the "campaigns" folder.
+  2. Copy the "_starter" folder and paste it.
+  3. Rename the copy after your campaign.
+       Use lowercase letters, numbers, and dashes only.
+       Example:  iron-tide
+  4. Edit the text files inside it, following
+     campaigns/_starter/README.md.
+
+
+--------------------------------------------------------------
+  B4.  BUILD
+--------------------------------------------------------------
+
+Double-click the  "Build OMNISLATE"  icon on the desktop.
+
+  A window opens.  If it asks which campaign, type its
+  number and press Enter.  It lists every page it made.
+  Lines marked FAILED say exactly which file and line to
+  fix.  Press Enter to close the window.
+
+  No icon on the desktop?  In this folder, double-click
+  build.sh and choose "Run in Terminal".
+
+
+--------------------------------------------------------------
+  B5.  LAUNCH
+--------------------------------------------------------------
+
+Open your finished page by double-clicking it:
+
+    dist/<your-campaign>/<chapter>/session-1.html
+
+  The page name comes from the "Output:" line in your
+  session file.  Each file in a chapter's sessions folder
+  makes one page.
+
+  For the tablet: copy the chapter's folder, such as
+  dist/<your-campaign>/chapter-1/, onto the tablet, then
+  open the page from there.
+
+  Skip app/display.html.  That is the empty engine the
+  builder fills in.  Opened by itself, it shows a note
+  pointing back to the dist folder.
+
+
+==============================================================
+  CHAPTERS (both paths)
+==============================================================
+
+  A campaign holds one folder per chapter (a story arc,
+  a season, or a separate group of players).  The starter
+  comes with "chapter-1".  For another chapter:
+
+  1. Inside your campaign folder, copy "_template" and
+     paste it right there.
+  2. Rename the copy, such as  season-2
+       Windows calls the copy "_template - Copy" and Mint
+       calls it "_template (copy)".  Either name is skipped
+       until you rename it, and the build report says so.
+  3. Open campaign.md in the copy and set its Name.
+
+  Each chapter gets its own pages and its own list on
+  the build page.  It shares the campaign's crest, skins,
+  triggers, worlds, and sounds unless it sets its own.
+
+  To switch a line off without deleting it, put "# " in
+  front of it.  Lines starting with # are notes.
+
+  Coded messages for the ANDIS terminal live in signals/.
+  The starter's example is LOAD "BEACON",8,1.  Tap ANDIS
+  in the top bar of session-1 to try it.
+
+
+==============================================================
+  IF SOMETHING LOOKS WRONG
+==============================================================
+
+  "unstablenhp" will not load
+        Tailscale is not connected on that device.
+
+  Page says "Sensor suite offline"
+        The browser or a script blocker is blocking
+        JavaScript.  Allow scripts for the page, reload.
+
+  Feeds say SIGNAL PENDING
+        No videos for that world yet.  Put them in the
+        chapter's media/ folder, named after the world:
+        kestrel-surface.mp4, kestrel-thermal.mp4,
+        kestrel-surface01.mp4
+
+  A field says TOO DISTANT
+        That is the scan depth in your session file
+        working as intended.  Raise it (long range,
+        orbital, planetside) to show more.
+
+
+==============================================================
+  THE SHORT VERSION
+==============================================================
+
+  Server:  Tailscale on, then http://unstablenhp/
+  Edit:    campaigns/<your-campaign>/  (text files)
+  Build:   saves rebuild on their own, or press Build
+           (laptop: double-click "Build OMNISLATE")
+  Play:    session links on the build page
+           (laptop: dist/<campaign>/<chapter>/<session>.html)
+  Chapter: copy _template inside your campaign, rename it
+  GM:      hold the top-left badge, or Ctrl + Shift + G
+
+  Stuck?  Ask Nathan.
