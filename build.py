@@ -34,7 +34,7 @@ import sys
 import traceback
 from pathlib import Path
 
-ENGINE = "3.6.1"
+ENGINE = "3.6.2"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "app" / "display.html"
 LIBRARY = ROOT / "library"
@@ -687,6 +687,7 @@ def parse_attachments(sig, file_dirs, image_dirs, warns, media_dirs=(), sound_di
                              "A shorter or lower-bitrate clip loads faster on the tablet")
             mime = SOUND_MIME.get(ext, "audio/mpeg")
             a["audio"] = f"data:{mime};base64," + base64.b64encode(p.read_bytes()).decode()
+            if "loop" in p.name.lower(): a["loop"] = True   # 3.6.2: *loop* files repeat
             tp = p.with_suffix(".txt")
             if tp.exists():
                 a["transcript"] = color_lines([t.rstrip() for t in tp.read_text(encoding="utf-8").splitlines() if t.strip()])

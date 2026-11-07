@@ -2456,6 +2456,7 @@ const DATA = /*__DATA__*/null;
       el.addEventListener("error", () => { if (TM.media && TM.media.el === el){ TM.media.err = true; tmDraw(); } });
       el.addEventListener("ended", () => tmDraw());
       el.src = a.kind === "A" ? a.audio : a.video;
+      if (a.loop) el.loop = true;   // 3.6.2: a file named *loop* repeats until closed
       mediaEls[key] = el;
     }
     TM.stack.push(TM.reveal);

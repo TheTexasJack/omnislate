@@ -51,3 +51,6 @@ If you received this message, do not trust any transmission originating from Pro
 [red]Leave! Immediately!
 [END PACKET]
 [0.0% CORRUPTION]
+
+### Attachments
+- PULSE: remnant-pulse-loop.mp3 | Carrier pulse, recovered.  Repeating.
