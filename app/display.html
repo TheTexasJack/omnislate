@@ -866,7 +866,7 @@ const DATA = /*__DATA__*/null;
       const v = document.createElement("video");
       v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = motion; v.preload = "auto";
       v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("disablepictureinpicture", "");
-      v.src = r.url;
+      v.src = motion ? r.url : r.url + "#t=0.5";   // 3.6.5: with motion off, phones still paint a still frame instead of black
       if (motion) v.play().catch(() => {});
       frag.append(v); return frag;
     }
