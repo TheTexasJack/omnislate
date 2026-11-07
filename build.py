@@ -34,7 +34,7 @@ import sys
 import traceback
 from pathlib import Path
 
-ENGINE = "3.6.2"
+ENGINE = "3.6.3"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "app" / "display.html"
 LIBRARY = ROOT / "library"
@@ -1221,6 +1221,14 @@ def build_session(target, manifest_path, ctx):
                 missing.append(slot)
         entries.append({"name": src["name"], "number": src["number"], "depth": depth, "atlas": not listed,
                         "fields": fields, "glitch": glitch, "deep": deep, "locked": locked, "images": images})
+        # 3.6.3: Audio signals.  media/{slug}-signal1 to -signal5 (.mp3 .ogg .wav .m4a) loop under Hazard flags.
+        aud = []
+        for n in range(1, 6):
+            for d in target["dirs"]:
+                hits = [h for h in sorted((d / "media").glob(f"{slug}-signal{n}.*")) if h.suffix.lower() in (".mp3", ".ogg", ".wav", ".m4a")]
+                if hits:
+                    aud.append(hits[0].name); break
+        entries[-1]["audio"] = aud
         if listed:
             gaps = []
             if "map" in missing:

@@ -1580,6 +1580,20 @@ const DATA = /*__DATA__*/null;
     (d.hazards || []).forEach(h => hl.append(el("span", "hz", h)));
     if (!(d.hazards || []).length) hl.append(el("span", "hz ok", "No hazards flagged"));
     hp.append(hl);
+    if ((w.audio || []).length){
+      hp.append(head("Audio signals", "eye"));
+      const al = el("div", "hz-list");
+      w.audio.forEach((f, i) => {
+        const b = el("button", "hz", "\u25B6 SIGNAL " + String(i + 1).padStart(2, "0")); b.type = "button"; b.style.cursor = "pointer";
+        b.addEventListener("click", () => {
+          if (!b._a){ b._a = new Audio(f); b._a.loop = true; }
+          if (b._a.paused){ b._a.play().catch(() => {}); b.textContent = "\u25A0 SIGNAL " + String(i + 1).padStart(2, "0"); }
+          else { b._a.pause(); b.textContent = "\u25B6 SIGNAL " + String(i + 1).padStart(2, "0"); }
+        });
+        al.append(b);
+      });
+      hp.append(al);
+    }
     if (w.depth !== "planetside") hp.append(el("p", "cap", "Closer scans may resolve more."));
     ds.append(hd, wp, op, bp, rp, hp);
     glitch(ds);
