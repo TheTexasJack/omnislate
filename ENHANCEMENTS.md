@@ -105,6 +105,7 @@ The running backlog for OMNISLATE.  Keep this file in the workshop folder beside
 | OMNI-061 | Globe layers | Idea | 2.5, 4.4 | Drifting clouds (roadmap 2.5), terrain relief, night-side lights (4.4).  Clouds need a cloud-free map plus a clouds-only image |
 | OMNI-062 | Season 2 umbrella crest reveal | Idea | new | Errans uses the PROMETHEUS sigil as its crest now.  When Pyretica returns in Season 2, a reveal or attack trigger could swap or corrupt the crest in fiction |
 | OMNI-070 | New worlds | In Progress | 4.6 | 3.1 made adding worlds a copy-and-fill job with no art required, and added Larkspur.  Pool worlds and canon locations as the campaign travels.  Generation, if any, runs in the workshop at build time.  Canon firewall applies |
+| OMNI-071 | ANDIS after-hours archive (Remnant) | Idea | new | About 20 easter eggs players explore between sessions once the buoy is decrypted: pre-accident crew manifest, repair logs with REMNANT follow-ups, a mess-hall food feud, episode-style shenanigans, Lancer nods, and a simple Asteroids-style game.  Rules (Nathan, 2026-11-07): hints and nods only, never copies; Lancer themed; SECCOM/HA crew have no aliens (they regard nonhumans as lesser); no table impact.  Next: Claudia drafts 20 titles with one-line pitches for approval |
 
 ---
 
