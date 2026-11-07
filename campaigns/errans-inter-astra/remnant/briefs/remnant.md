@@ -1,15 +1,16 @@
 # Remnant briefs.  Player-facing text only.  Format: see campaigns/_starter/chapter-1/briefs/briefs.md.
-# Issued By is left off until the warrant's sponsor is decided.
 
 ## remnant-orders
 
 - **Title:** Recovery Order: Magnus Contact
 - **Type:** Mission brief
 - **Location:** Magnus, high orbit
+- **Issued By:** Harrison Armory
 - **World:** magnus
 
 ### Situation
 
+- The Lance is aboard the USC-CV California.
 - A recovered OmniNet drift packet reached the Lance through an outer-system relay buoy.  Its authentication is corrupted and most of it is still encrypted.
 - Magnus traffic control logged a cold, dark capital hull holding about 384,000 km off the planet.  Registry lists it as lost.
 - The contact does not answer hails.
