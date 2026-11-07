@@ -34,7 +34,7 @@ import sys
 import traceback
 from pathlib import Path
 
-ENGINE = "3.6.5"
+ENGINE = "3.6.6"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "app" / "display.html"
 LIBRARY = ROOT / "library"

@@ -732,6 +732,10 @@ const DATA = /*__DATA__*/null;
     wireKick();
   }
   $("bMotion").addEventListener("click", () => { motion = !motion; applyMotion(); });
+  // 3.6.6: phones skip autoplay on feeds built while hidden.  Any tap nudges every paused feed video.
+  const kickFeeds = () => { if (!motion) return; document.querySelectorAll(".feed video").forEach(v => { if (v.paused) v.play().catch(() => {}); }); };
+  document.addEventListener("pointerdown", kickFeeds, {passive:true});
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") setTimeout(kickFeeds, 200); });
   $("bFull").addEventListener("click", async () => {
     try{
       if (document.fullscreenElement) await document.exitFullscreen();
@@ -1150,7 +1154,13 @@ const DATA = /*__DATA__*/null;
     // Surface drone 01: free-form second feed ({slug}-surface01.mp4), no text.
     const tp = el("section", "panel d-thermal d-drone");
     const drone01 = () => makeFeed("Surface drone 01", () => "surface01", () => "Signal pending");
-    tp.append(drone01().feed);
+    const D1 = drone01();
+    tp.append(D1.feed);
+    // 3.6.6: a Visible button like drone 02's, which reloads the feed on demand.
+    const bar1 = el("div", "feed-bar"); bar1.append(head("Surface drone 01", "feed"));
+    const v1 = el("button", "mode", "Visible"); v1.type = "button"; v1.setAttribute("aria-pressed", "true");
+    v1.addEventListener("click", ev => { ev.stopPropagation(); D1.setMode("vis"); });
+    bar1.append(v1); tp.append(bar1);
     tappable(tp, () => openEx("Surface drone 01", body => {
       const m = el("div", "ex-media"); m.append(drone01().feed); body.append(m);
     }));
