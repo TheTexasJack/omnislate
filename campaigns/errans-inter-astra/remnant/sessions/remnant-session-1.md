@@ -4,3 +4,4 @@ Output: remnant-session-1
 Worlds: magnus@orbital
 Atlas: long range
 Signals: remnant-buoy
+Briefs: remnant-orders
