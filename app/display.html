@@ -182,7 +182,8 @@ button{font:inherit;color:inherit}
 
 /* ---------- Drone feed ---------- */
 .d-feed{padding:10px}
-.d-drone{padding:10px;display:flex}
+.d-drone{padding:10px;display:flex;flex-wrap:wrap}
+.d-drone .feed-bar{flex-basis:100%}
 .d-drone .feed{flex:1;aspect-ratio:16/9;min-height:180px}
 @media (max-width:700px){.d-drone .feed{flex:none;width:100%;min-height:0}}
 .feed{position:relative;aspect-ratio:16/9;overflow:hidden;background:#000;border-radius:calc(var(--radius) - 4px)}
