@@ -148,6 +148,8 @@ button{font:inherit;color:inherit}
 .frame canvas.noise{display:block;width:100%;height:100%}
 .frame video,.feed video{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
 .feed video{position:absolute;inset:0}
+/* 3.6.4: drone videos always show the whole frame, and on phones the feed keeps 16:9 instead of stretching. */
+.feed video{object-fit:contain}
 .gm-media{display:grid;gap:6px;margin:0}
 .gm-media div{padding:6px 10px;border:1px solid #445;border-radius:8px;background:#10161e;font-size:14px}
 .gm-media b{display:block;font-size:15px}
@@ -182,6 +184,7 @@ button{font:inherit;color:inherit}
 .d-feed{padding:10px}
 .d-drone{padding:10px;display:flex}
 .d-drone .feed{flex:1;aspect-ratio:16/9;min-height:180px}
+@media (max-width:700px){.d-drone .feed{flex:none;width:100%;min-height:0}}
 .feed{position:relative;aspect-ratio:16/9;overflow:hidden;background:#000;border-radius:calc(var(--radius) - 4px)}
 .feed img{position:absolute;left:-6%;top:-6%;width:112%;height:112%;object-fit:cover;
   animation:drift 38s ease-in-out infinite alternate}
