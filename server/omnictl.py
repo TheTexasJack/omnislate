@@ -37,6 +37,7 @@ CONFIG = ETC / "gms.json"
 STATE = Path(os.environ.get("OMNI_STATE", "/var/lib/omnislate"))
 BACKUPS = Path(os.environ.get("OMNI_BACKUPS", "/srv/omnislate-backups"))
 SAMBA_INC = Path(os.environ.get("OMNI_SAMBA_INC", "/etc/samba/omnislate.conf"))
+SHARED = Path(os.environ.get("OMNI_SHARED", "/srv/omnislate-shared"))   # one drive every GM and the admin can read and write
 SMB_CONF = Path(os.environ.get("OMNI_SMB_CONF", "/etc/samba/smb.conf"))
 UNIT = Path(os.environ.get("OMNI_UNIT", "/etc/systemd/system/omnislate-web.service"))
 GROUP = "omnigm"
@@ -192,14 +193,27 @@ def fix_perms(cfg):
     os.chmod(STATE, 0o700)
 
 
+def ensure_shared(admin):
+    """The common drive: every GM plus the admin, read and write, outside the workshop so builds never touch it."""
+    SHARED.mkdir(parents=True, exist_ok=True)
+    run(["chown", f"root:{GROUP}", str(SHARED)])
+    os.chmod(SHARED, 0o2770)
+    run(["setfacl", "-R", "-m", f"g:{GROUP}:rwX,u:{admin}:rwX", str(SHARED)])
+    run(["find", str(SHARED), "-type", "d", "-exec", "setfacl", "-d", "-m", f"g:{GROUP}:rwx,u:{admin}:rwx", "{}", "+"])
+
+
 def write_samba(cfg):
     admin = admin_name(cfg)
+    ensure_shared(admin)
     parts = ["# Managed by omnictl.py.  Edits here are overwritten.",
              "# Access is limited to the Tailscale network by the firewall (ufw allows only tailscale0).", "",
              "[omnislate]", "   comment = OMNISLATE reference (read-only)", f"   path = {ROOT}", "   read only = yes",
              f"   valid users = @{GROUP}", "   hide unreadable = yes", "   browseable = yes", "",
              "[omnislate-admin]", "   comment = OMNISLATE workshop (admin)", f"   path = {ROOT}", "   read only = no",
              f"   valid users = {admin}", "   inherit acls = yes", "   create mask = 0664", "   directory mask = 0775", ""]
+    parts += ["[omnislate-shared]", "   comment = OMNISLATE shared drive (every GM and the admin)", f"   path = {SHARED}",
+              "   read only = no", f"   valid users = @{GROUP} {admin}", f"   force group = {GROUP}", "   inherit acls = yes",
+              "   create mask = 0660", "   directory mask = 2770", "   veto files = /.*/", "   delete veto files = yes", ""]
     for c in sorted(p.name for p in (ROOT / "campaigns").iterdir() if p.is_dir() and not p.name.startswith("_")):
         who = owners(cfg, c) + [admin]
         parts += [f"[{c}]", f"   comment = OMNISLATE campaign {c}", f"   path = {ROOT}/campaigns/{c}", "   read only = no",
@@ -267,7 +281,7 @@ def cmd_install(args):
     restart_web()
     say("\nDone.")
     say("  Build page:   http://unstablenhp/          (from any device on your Tailscale network)")
-    say("  Shares:       \\\\unstablenhp\\omnislate-admin   and one share per campaign")
+    say("  Shares:       \\\\unstablenhp\\omnislate-admin, \\\\unstablenhp\\omnislate-shared, and one share per campaign")
     say("  Next:         sudo python3 server/omnictl.py add-gm jarrett <his-campaign-name>")
 
 

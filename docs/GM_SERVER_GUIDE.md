@@ -20,6 +20,8 @@ You need three things from Nathan: a **Tailscale invite link**, your **campaign 
 4. Tick **Reconnect at sign-in** and **Connect using different credentials**, then Finish.
 5. User name: `jarrett`.  Password: the one Nathan gave you.  Tick **Remember my credentials**.
 
+**Shared drive:** map `\\unstablenhp\omnislate-shared` the same way.  It is one folder that you and Nathan can both read and write, for swapping files.  Nothing in it builds.
+
 Optional: map `\\unstablenhp\omnislate` the same way.  It is a read-only reference copy of the whole workshop: README files, the shared world pool, and the starter example.
 
 ## 3. Edit

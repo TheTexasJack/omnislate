@@ -71,6 +71,8 @@ Log in as `lancer` with the same password and bookmark it.  That is the whole wo
 
 ## 6. Day-to-day commands
 
+Since 3.6.8 there is also a common drive, `\\unstablenhp\omnislate-shared` (`/srv/omnislate-shared`), that every GM and you can read and write.  `update`, `add-gm`, and `fix-perms` create it if it is missing.
+
 Run these from `/srv/omnislate`:
 
 | Task | Command |
