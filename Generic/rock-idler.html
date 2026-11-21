@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>R.O.C.K. Idler v1.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* VOICE: deadpan screensaver; a rock doing careful, pointless work
+   IDEA: an old-school idle screensaver crossed with a 1-bit cockpit display
+   PICTURE: the whole screen is the toy; R.O.C.K. shoves debris into a shape, then rockets through it
+   COLOUR and TYPE: pure black and white; Chakra Petch for labels, Share Tech Mono for readouts
+   LAYOUT: full-bleed canvas; controls and status fade away so nothing sits still on the glass */
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:#000;color:#fff;overflow:hidden;overscroll-behavior:none}
+body{font:15px/1.45 "Share Tech Mono",ui-monospace,Menlo,Consolas,monospace;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+body.quiet #c{cursor:none}
+#scan{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.3) 2px 3px)}
+#hud{position:fixed;top:max(10px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px 14px;pointer-events:none;transition:opacity .5s}
+body.quiet #hud{opacity:0}
+.id{display:flex;flex-direction:column;gap:2px;background:#000;padding:4px 8px;border:1px solid #fff}
+.id b{font:700 17px/1.2 "Chakra Petch",sans-serif;letter-spacing:.05em}
+.id span{font-size:13px;color:#bbb;white-space:pre-wrap}
+.btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+button{font:700 14px "Chakra Petch",sans-serif;letter-spacing:.06em;background:#000;color:#fff;border:2px solid #fff;min-height:44px;padding:0 14px;cursor:pointer;touch-action:manipulation}
+button:hover,button:focus-visible{background:#fff;color:#000;outline:none}
+body:not(.quiet) #hud button{pointer-events:auto}
+#st{position:fixed;left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));pointer-events:none;opacity:0;transition:opacity .7s;white-space:pre-wrap;font-size:15px}
+#st.on{opacity:.92}
+#st span{background:#000;padding:1px 6px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+#help{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.84);padding:16px;overflow:auto}
+#help div{max-width:560px;border:2px solid #fff;background:#000;padding:18px 20px}
+#help h1{font:700 22px/1.2 "Chakra Petch",sans-serif;margin:0 0 8px}
+#help p,#help li{white-space:pre-wrap}
+#help p{margin:0 0 10px}
+#help ul{margin:0 0 14px;padding-left:20px}
+#help li{margin-bottom:6px}
+#help code{background:#fff;color:#000;padding:0 4px;overflow-wrap:anywhere}
+</style>
+</head>
+<body class="quiet">
+<canvas id="c" aria-label="R.O.C.K., a small rock-shaped robot, pushing floating debris into shapes and then smashing them"></canvas>
+<div id="scan"></div>
+<div id="hud">
+  <div class="id"><b>R.O.C.K. IDLER v1.0</b><span id="stats"></span><span id="wl">STAY AWAKE: OFF</span></div>
+  <div class="btns">
+    <button id="bFull" type="button">FULL SCREEN</button>
+    <button id="bSnd" type="button">SOUND: OFF</button>
+    <button id="bHelp" type="button">HELP</button>
+  </div>
+</div>
+<div id="st" aria-live="polite"><span id="stx"></span></div>
+<div id="help" hidden>
+  <div>
+    <h1>R.O.C.K. IDLER v1.0</h1>
+    <p>R.O.C.K. builds a shape out of debris, admires it, then smashes it.  Then he does it again.  That is the whole job.</p>
+    <ul>
+      <li>Tap R.O.C.K. to poke him.</li>
+      <li>Drag R.O.C.K. to carry him.  Let go to throw him.</li>
+      <li>Tap or swipe the debris to stir it up.  Yes, you can undo his work.</li>
+      <li>Keyboard: Space smashes now.  N starts a new shape.  F is full screen.  M is sound.  H is this panel.</li>
+      <li>Add your own short words to the address: <code>rock-idler.html?words=GG,HI</code></li>
+      <li>The screen stays awake while this page is open, where the browser allows it.</li>
+    </ul>
+    <button id="bClose" type="button">CLOSE</button>
+  </div>
+</div>
+<script>
+{
+/* ================= EDIT ME =================
+   Extra words for R.O.C.K. to build.  Short words work best (2 to 4 letters, 8 at most).
+   Example:  const CUSTOM_WORDS = ['GG', 'RA'];
+   You can also add words in the address bar:  rock-idler.html?words=GG,RA
+   =========================================== */
+const CUSTOM_WORDS = [];
+const VERSION = '1.0';
+
+const TAU = Math.PI * 2;
+const rnd = (a, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
+const pick = a => a[(Math.random() * a.length) | 0];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const hyp = Math.hypot;
+const RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const $ = id => document.getElementById(id);
+const C = $('c'), X = C.getContext('2d'), stEl = $('st'), stx = $('stx'), statEl = $('stats');
+let W = 0, H = 0, U = 0, DPR = 1, PR = 8, SPD = 300, cx = 0, cy = 0, S = 200, now = 0;
+
+/* ---------- 1-bit dither fills ---------- */
+function mkPat(n, fn) { const p = document.createElement('canvas'); p.width = p.height = n; fn(p.getContext('2d')); return X.createPattern(p, 'repeat'); }
+const PL = mkPat(3, g => { g.fillStyle = '#fff'; g.fillRect(0, 0, 3, 3); g.fillStyle = '#000'; g.fillRect(0, 0, 1, 1); });
+const PM = mkPat(4, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 4, 4); g.fillStyle = '#fff'; g.fillRect(0, 0, 2, 2); g.fillRect(2, 2, 2, 2); });
+const PD = mkPat(5, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 5, 5); g.fillStyle = '#fff'; g.fillRect(0, 0, 1.5, 1.5); });
+
+/* ---------- shapes: each one is drawn on a 100 x 100 card, then sampled into points ---------- */
+const poly = (g, pts) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); };
+const cut = (g, fn) => { g.save(); g.globalCompositeOperation = 'destination-out'; fn(); g.restore(); };
+const word = w => g => { g.font = 'bold 64px "Chakra Petch",Arial,Helvetica,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; const k = Math.min(1, 90 / Math.max(1, g.measureText(w).width)); g.save(); g.translate(50, 52); g.scale(k, k); g.fillText(w, 0, 0); g.restore(); };
+const heart = g => { g.beginPath(); g.moveTo(50, 90); g.bezierCurveTo(4, 58, 4, 22, 28, 14); g.bezierCurveTo(41, 10, 50, 20, 50, 30); g.bezierCurveTo(50, 20, 59, 10, 72, 14); g.bezierCurveTo(96, 22, 96, 58, 50, 90); g.fill(); };
+const SHAPES = [
+  { n: 'HEART', w: 1, d: heart },
+  { n: 'STAR', w: 1, d: g => { const p = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 20 : 47; p.push([50 + Math.cos(a) * r, 53 + Math.sin(a) * r]); } poly(g, p); g.fill(); } },
+  { n: 'RING', w: 1, d: g => { g.lineWidth = 12; g.beginPath(); g.arc(50, 50, 38, 0, TAU); g.stroke(); } },
+  { n: 'TRIANGLE', w: .8, d: g => { g.lineWidth = 11; poly(g, [[50, 12], [90, 84], [10, 84]]); g.stroke(); } },
+  { n: 'ARROW', w: 1, d: g => { poly(g, [[6, 38], [54, 38], [54, 16], [96, 50], [54, 84], [54, 62], [6, 62]]); g.fill(); } },
+  { n: 'BOLT', w: 1, d: g => { poly(g, [[62, 2], [20, 54], [44, 54], [32, 98], [80, 40], [55, 40], [72, 2]]); g.fill(); } },
+  { n: 'MOON', w: 1, d: g => { g.beginPath(); g.arc(46, 50, 42, 0, TAU); g.fill(); cut(g, () => { g.beginPath(); g.arc(66, 40, 36, 0, TAU); g.fill(); }); } },
+  { n: 'SMILE', w: 1, d: g => { g.lineWidth = 9; g.beginPath(); g.arc(50, 50, 42, 0, TAU); g.stroke(); g.beginPath(); g.arc(35, 38, 7, 0, TAU); g.moveTo(72, 38); g.arc(65, 38, 7, 0, TAU); g.fill(); g.beginPath(); g.arc(50, 50, 24, TAU * .07, TAU * .43); g.stroke(); } },
+  { n: 'SKULL', w: .35, d: g => { g.beginPath(); g.arc(50, 40, 34, 0, TAU); g.fill(); g.fillRect(32, 62, 36, 28); cut(g, () => { g.beginPath(); g.arc(36, 42, 10, 0, TAU); g.moveTo(74, 42); g.arc(64, 42, 10, 0, TAU); g.fill(); poly(g, [[50, 54], [45, 64], [55, 64]]); g.fill(); g.fillRect(42.5, 78, 3, 12); g.fillRect(54.5, 78, 3, 12); }); } },
+  { n: 'PLANET', w: 1, d: g => { g.beginPath(); g.arc(50, 50, 25, 0, TAU); g.fill(); g.lineWidth = 7; g.beginPath(); g.ellipse(50, 50, 47, 13, -.4, 0, TAU); g.stroke(); } },
+  { n: 'FISH', w: .8, d: g => { g.beginPath(); g.ellipse(42, 50, 32, 21, 0, 0, TAU); g.fill(); poly(g, [[66, 50], [96, 26], [96, 74]]); g.fill(); cut(g, () => { g.beginPath(); g.arc(26, 44, 5, 0, TAU); g.fill(); }); } },
+  { n: 'HOUSE', w: .8, d: g => { poly(g, [[50, 6], [96, 46], [4, 46]]); g.fill(); g.fillRect(16, 46, 68, 46); cut(g, () => g.fillRect(41, 62, 18, 30)); } },
+  { n: 'SELF PORTRAIT', w: .7, d: g => { poly(g, [[8, 52], [16, 26], [36, 10], [62, 8], [84, 20], [94, 46], [90, 72], [70, 88], [38, 90], [16, 78]]); g.fill(); cut(g, () => g.fillRect(26, 40, 50, 26)); g.fillRect(34, 45, 11, 16); g.fillRect(57, 45, 11, 16); } },
+  { n: 'HI', w: 1, d: word('HI') },
+  { n: 'OK', w: .8, d: word('OK') },
+  { n: 'QUESTION MARK', w: .7, d: word('?') }
+];
+{
+  let extra = CUSTOM_WORDS.slice();
+  try { const q = new URLSearchParams(location.search).get('words'); if (q) extra = extra.concat(q.split(',')); } catch (e) {}
+  extra.map(w => String(w).trim().toUpperCase().slice(0, 8)).filter((w, i, a) => w && a.indexOf(w) === i && !SHAPES.some(s => s.n === w)).slice(0, 12).forEach(w => SHAPES.push({ n: w, w: 1.5, d: word(w) }));
+}
+const oc = document.createElement('canvas'), og = oc.getContext('2d', { willReadFrequently: true });
+function sample(draw, T) {
+  const n = 128; oc.width = oc.height = n;
+  og.setTransform(n / 100, 0, 0, n / 100, 0, 0);
+  og.fillStyle = og.strokeStyle = '#fff'; og.lineJoin = og.lineCap = 'round';
+  draw(og);
+  const d = og.getImageData(0, 0, n, n).data;
+  const lit = (x, y) => { x |= 0; y |= 0; return x >= 0 && y >= 0 && x < n && y < n && d[(y * n + x) * 4 + 3] > 120; };
+  let pts = [];
+  for (let s = 30; s >= 1.2; s *= .97) {
+    const ox = rnd(s), oy = rnd(s); pts = []; let row = 0;
+    for (let y = oy; y < n; y += s * .866, row++) for (let x = ox + (row % 2 ? s / 2 : 0) - s; x < n; x += s) if (lit(x, y)) pts.push([x, y]);
+    if (pts.length >= T) break;
+  }
+  while (pts.length > T) pts.splice((Math.random() * pts.length) | 0, 1);
+  if (!pts.length) pts = [[n / 2, n / 2]];
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const p of pts) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  const k = Math.max(x1 - x0, y1 - y0, 8), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  return pts.map(p => [(p[0] - mx) / k, (p[1] - my) / k]);
+}
+
+/* ---------- saved counters, status line, sound ---------- */
+const stats = { built: 0, smashed: 0, poked: 0 };
+try { const s = JSON.parse(localStorage.getItem('rock-idler') || '{}'); for (const k in stats) if (Number.isFinite(s[k])) stats[k] = Math.max(0, Math.floor(s[k])); } catch (e) {}
+function save() { try { localStorage.setItem('rock-idler', JSON.stringify(stats)); } catch (e) {} statEl.textContent = 'BUILT ' + stats.built + '  SMASHED ' + stats.smashed + '  POKED ' + stats.poked + '  PURPOSE: NONE'; }
+let sayTimer = 0, lastSay = -99;
+function say(m) { stx.textContent = '> ' + m; stEl.classList.add('on'); clearTimeout(sayTimer); sayTimer = setTimeout(() => stEl.classList.remove('on'), 7000); lastSay = now; }
+let snd = false, ac = null, nbuf = null;
+function tone(f, d, type, g, f2) { if (!snd || !ac) return; try { const o = ac.createOscillator(), a = ac.createGain(), t = ac.currentTime; o.type = type || 'square'; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d); a.gain.setValueAtTime(g || .04, t); a.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(a); a.connect(ac.destination); o.start(t); o.stop(t + d + .02); } catch (e) {} }
+function noise(d, g) { if (!snd || !ac) return; try { if (!nbuf) { nbuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const ch = nbuf.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1; } const s = ac.createBufferSource(), a = ac.createGain(), f = ac.createBiquadFilter(), t = ac.currentTime; s.buffer = nbuf; f.type = 'lowpass'; f.frequency.setValueAtTime(2600, t); f.frequency.exponentialRampToValueAtTime(110, t + d); a.gain.setValueAtTime(g, t); a.gain.exponentialRampToValueAtTime(.0001, t + d); s.connect(f); f.connect(a); a.connect(ac.destination); s.start(t); s.stop(t + d); } catch (e) {} }
+
+/* ---------- the world ---------- */
+let pieces = [], stars = [], parts = [], rings = [], shape = null, lastName = '', total = 0, shake = 0;
+let alive = false, counted = false, leaving = false, forceHit = false, missed = false, half = false;
+let cur = null, stepT = 0, pauseT = 0, evT = rnd(18, 32), idleT = rnd(26, 44), aim = null, lookP = null, lookT = 0, scanP = null, napDur = 8;
+let tapSayT = -99, pokeSayT = -99, holdSayT = -99;
+const rock = { x: -90, y: 0, vx: 0, vy: 0, R: 30, face: 1, fx: 1, rot: 0, rv: 0, sc: 1, lx: 0, ly: 0, eye: 'open', eyeT: 0, blink: 0, nb: 2, bub: null, bubT: 0, thr: .3, ant: 0, antV: 0, dish: -1, jit: 0, mode: 'ENTER', t: 0, ph: 0, dx: 0, dy: 0 };
+const ptr = { x: -9999, y: -9999, down: false, id: -1, vx: 0, vy: 0, lt: 0, seen: -99, grab: false, moved: false, sx: 0, sy: 0 };
+const IDLE = ['R.O.C.K. is still working.  Nobody asked.', 'Work continues.  Purpose: none.', 'Telemetry nominal.  Output: one shape, eventually.', 'R.O.C.K. placed a piece.  It was fine.', 'Progress is being made.  Toward what is unclear.', 'R.O.C.K. remains on task.  The task remains pointless.'];
+
+function mkPiece() {
+  const n = 4 + ((Math.random() * 4) | 0), pts = [];
+  for (let i = 0; i < n; i++) { const a = i / n * TAU + rnd(-.3, .3), r = rnd(.65, 1.1); pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+  const k = rnd(.8, 1.2);
+  return { x: rnd(W), y: rnd(H), vx: rnd(-12, 12), vy: rnd(-12, 12), a: rnd(TAU), va: rnd(-.8, .8), k, r: PR * k, pts, st: 0, as: false, tx: 0, ty: 0, nx: 0, ny: 0, ph: rnd(TAU), pop: 0 };
+}
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2); W = Math.max(200, window.innerWidth); H = Math.max(200, window.innerHeight); U = Math.min(W, H);
+  C.width = Math.round(W * DPR); C.height = Math.round(H * DPR);
+  cx = W / 2; cy = H * .47; S = Math.min(W * .8, H * .5);
+  const N = clamp(Math.round(Math.sqrt(W * H) / 10), 50, 110);
+  PR = clamp(S * .2 / Math.sqrt(N * .85), 6, 26); rock.R = clamp(U * .062, 24, 70); SPD = clamp(U * .55, 200, 1100);
+  while (pieces.length < N) pieces.push(mkPiece());
+  for (const p of pieces) { p.r = PR * p.k; if (p.as) { p.tx = cx + p.nx * S; p.ty = cy + p.ny * S; if (p.st === 2) p.st = 1; } if (p.st === 0) { p.x = clamp(p.x, 0, W); p.y = clamp(p.y, 0, H); } }
+  rock.x = clamp(rock.x, -120, W + 120); rock.y = clamp(rock.y, -120, H + 120);
+  stars = []; const sn = clamp(Math.round(W * H / 14000), 30, 130);
+  for (let i = 0; i < sn; i++) stars.push({ x: rnd(W), y: rnd(H), s: Math.random() < .2 ? 2 : 1, ph: rnd(TAU), tw: rnd(.4, 1.6) });
+}
+function newShape() {
+  for (const p of pieces) { p.as = false; p.st = 0; }
+  const pool = SHAPES.filter(s => s.n !== lastName); let tw = 0; for (const s of pool) tw += s.w;
+  let r = Math.random() * tw; shape = pool[0]; for (const s of pool) { r -= s.w; if (r <= 0) { shape = s; break; } }
+  lastName = shape.n;
+  const norm = sample(shape.d, Math.round(pieces.length * .85)), free = pieces.slice();
+  for (const t of norm) {
+    const tx = cx + t[0] * S, ty = cy + t[1] * S; let bi = 0, bd = 1e18;
+    for (let i = 0; i < free.length; i++) { const q = free[i], d = (q.x - tx) * (q.x - tx) + (q.y - ty) * (q.y - ty); if (d < bd) { bd = d; bi = i; } }
+    const p = free.splice(bi, 1)[0]; p.as = true; p.nx = t[0]; p.ny = t[1]; p.tx = tx; p.ty = ty;
+  }
+  total = norm.length; alive = true; counted = false; leaving = false; forceHit = false; missed = false; half = false; cur = null;
+  say('R.O.C.K. is building: ' + shape.n + '.  Reason: none.');
+}
+function placedN() { let n = 0; for (const p of pieces) if (p.as && p.st === 2) n++; return n; }
+function looseN() { let n = 0; for (const p of pieces) if (p.as && p.st === 0) n++; return n; }
+function allPlaced() { for (const p of pieces) if (p.as && p.st !== 2) return false; return total > 0; }
+function bubble(b, t) { rock.bub = b; rock.bubT = t || 2; }
+function eye(e, t) { rock.eye = e; rock.eyeT = t || 0; }
+function lookAt(x, y, t) { lookP = { x, y }; lookT = t || 1.5; }
+function setMode(m) { rock.mode = m; rock.t = 0; rock.ph = 0; if (MODES[m].go) MODES[m].go(); }
+function resume() { if (!alive) return setMode('LOITER'); if (leaving) return setMode('LEAVE'); if (forceHit) return setMode('WINDUP'); setMode(allPlaced() ? 'ADMIRE' : 'BUILD'); }
+function arrive(tx, ty, sp, dt, k) { const dx = tx - rock.x, dy = ty - rock.y, d = hyp(dx, dy), v = Math.min(sp, d * 7), f = Math.min(1, dt * (k || 7)); rock.vx += ((d > .01 ? dx / d * v : 0) - rock.vx) * f; rock.vy += ((d > .01 ? dy / d * v : 0) - rock.vy) * f; return d; }
+function brake(dt) { const f = Math.exp(-6 * dt); rock.vx *= f; rock.vy *= f; }
+function burst() {
+  alive = false; forceHit = false; stats.smashed++; save();
+  for (const p of pieces) {
+    const dx = p.x - cx, dy = p.y - cy, d = hyp(dx, dy) || 1;
+    if (p.as) { const sp = SPD * rnd(.6, 1.8); p.vx = dx / d * sp + aim.dx * SPD * rnd(.2, 1.1); p.vy = dy / d * sp + aim.dy * SPD * rnd(.2, 1.1); p.va = rnd(-11, 11); p.st = 0; p.as = false; }
+    else if (d < S) { p.vx += dx / d * SPD * .5; p.vy += dy / d * SPD * .5; }
+  }
+  rings.push({ x: cx, y: cy, r: S * .1, v: S * 2.4, l: .7 }, { x: cx, y: cy, r: 4, v: S * 1.5, l: .9 });
+  for (let i = 0; i < 28; i++) { const a = rnd(TAU), s = rnd(60, 520); parts.push({ x: cx + rnd(-S, S) * .2, y: cy + rnd(-S, S) * .2, vx: Math.cos(a) * s, vy: Math.sin(a) * s, l: rnd(.4, 1), m: 1, s: rnd(2, 5) }); }
+  if (!RM) shake = 1;
+  noise(.7, .25); tone(110, .5, 'sine', .2, 38);
+}
+
+/* ---------- R.O.C.K.'s brain: one entry per mode ---------- */
+const MODES = {
+  ENTER: {
+    go() { rock.dx = rnd(W * .25, W * .75); rock.dy = rnd(H * .3, H * .7); },
+    up(dt) { if (arrive(rock.dx, rock.dy, SPD * .7, dt) < 16 || rock.t > 6) { if (!alive) newShape(); resume(); } }
+  },
+  BUILD: {
+    up(dt) {
+      if (pauseT > 0) { brake(dt); return; }
+      if (!cur || cur.st !== 0 || !cur.as) {
+        cur = null; let bd = 1e18;
+        for (const p of pieces) if (p.as && p.st === 0) { const d = (p.x - rock.x) * (p.x - rock.x) + (p.y - rock.y) * (p.y - rock.y); if (d < bd) { bd = d; cur = p; } }
+        stepT = 0;
+        if (!cur) { brake(dt); lookAt(cx, cy, .3); if (allPlaced()) setMode('ADMIRE'); return; }
+      }
+      stepT += dt;
+      let dx = cur.tx - cur.x, dy = cur.ty - cur.y; const d = hyp(dx, dy) || 1; dx /= d; dy /= d;
+      const gap = rock.R * .95 + cur.r + 3, ad = arrive(cur.x - dx * gap, cur.y - dy * gap, SPD, dt);
+      if (ad < 10 || d < 8 || stepT > 5) {
+        cur.st = 1; cur.vx = dx * SPD * .5; cur.vy = dy * SPD * .5; cur.va = rnd(-4, 4);
+        rock.vx += dx * SPD * .45; rock.vy += dy * SPD * .45; tone(520 + rnd(120), .03, 'square', .015); cur = null;
+      }
+      if (!half && total > 6 && placedN() >= total / 2) { half = true; say(shape.n + ': 50% complete.'); }
+    }
+  },
+  ADMIRE: {
+    go() {
+      const side = rock.x < cx ? -1 : 1;
+      if (W / 2 - S * .5 > rock.R * 2.8) { rock.dx = cx + side * (S * .5 + rock.R * 1.9); rock.dy = cy + rnd(-.15, .15) * S; }
+      else { const below = H - (cy + S * .5) > rock.R * 3; rock.dx = cx + rnd(-.25, .25) * S; rock.dy = below ? cy + S * .5 + rock.R * 1.9 : cy - S * .5 - rock.R * 1.9; }
+    },
+    up(dt) {
+      if (looseN()) return setMode('BUILD');
+      if (rock.ph === 0) {
+        if (arrive(rock.dx, rock.dy, SPD * .8, dt) < 14 || rock.t > 4) {
+          rock.ph = 1; rock.t = 0; bubble(pick(['heart', '!', ':)', '...']), 2.4); eye('happy', 2.6);
+          if (!counted) { counted = true; stats.built++; save(); say(shape.n + ' complete.  R.O.C.K. is admiring it.'); tone(660, .08); tone(990, .16, 'square', .03); }
+        }
+      } else {
+        brake(dt); lookAt(cx, cy, .3); rock.face = cx >= rock.x ? 1 : -1;
+        if (rock.t > 3.4) {
+          if (!forceHit && Math.random() < .1) { leaving = true; say('R.O.C.K. has decided ' + shape.n + ' is finished.'); setMode('LEAVE'); }
+          else setMode('WINDUP');
+        }
+      }
+    }
+  },
+  WINDUP: {
+    go() {
+      let best = null; const m = rock.R * 2, mb = m + 46;
+      for (let i = 0; i < 5; i++) {
+        const a = rnd(TAU), dx = Math.cos(a), dy = Math.sin(a);
+        const lx = dx > 0 ? (cx - m) / dx : dx < 0 ? (W - m - cx) / -dx : 1e9, ly = dy > 0 ? (cy - m) / dy : dy < 0 ? (H - mb - cy) / -dy : 1e9, L = Math.min(lx, ly);
+        if (!best || L > best.L) best = { dx, dy, L };
+      }
+      const off = !forceHit && Math.random() < .12 ? S * .85 * (Math.random() < .5 ? -1 : 1) : 0;
+      aim = { dx: best.dx, dy: best.dy, hit: false, clip: 0 }; missed = false;
+      rock.dx = clamp(cx - best.dx * best.L - best.dy * off, m, W - m); rock.dy = clamp(cy - best.dy * best.L + best.dx * off, m, H - mb);
+    },
+    up(dt) {
+      if (rock.ph === 0) {
+        if (arrive(rock.dx, rock.dy, SPD * 1.1, dt) < 10 || rock.t > 4) { rock.ph = 1; rock.t = 0; eye('squint'); say('R.O.C.K. has made a decision.'); tone(70, 1.3, 'sawtooth', .05, 320); }
+      } else {
+        brake(dt); rock.face = aim.dx >= 0 ? 1 : -1; lookAt(rock.x + aim.dx * 200, rock.y + aim.dy * 200, .2);
+        rock.jit = Math.min(1, rock.t / 1.2); rock.x -= aim.dx * 14 * dt; rock.y -= aim.dy * 14 * dt;
+        if (rock.t > 1.35) setMode('ROCKET');
+      }
+    }
+  },
+  ROCKET: {
+    go() { eye('wide'); tone(180, .6, 'sawtooth', .06, 900); noise(.5, .08); },
+    up(dt) {
+      const RS = SPD * 4.2, f = Math.min(1, dt * 9);
+      rock.vx += (aim.dx * RS - rock.vx) * f; rock.vy += (aim.dy * RS - rock.vy) * f;
+      for (let i = 0; i < 3; i++) parts.push({ x: rock.x - aim.dx * rock.R + rnd(-8, 8), y: rock.y - aim.dy * rock.R + rnd(-8, 8), vx: -aim.dx * rnd(40, 160) + rnd(-40, 40), vy: -aim.dy * rnd(40, 160) + rnd(-40, 40), l: rnd(.25, .6), m: .6, s: rnd(2, 5) });
+      const hr = rock.R * 2.3;
+      for (const p of pieces) {
+        const ddx = p.x - rock.x, ddy = p.y - rock.y, d = hyp(ddx, ddy);
+        if (d < hr + p.r) { if (p.st && p.as) aim.clip++; p.st = 0; const k = rnd(.18, .5); p.vx = aim.dx * RS * k + ddx / (d || 1) * RS * .25; p.vy = aim.dy * RS * k + ddy / (d || 1) * RS * .25; p.va = rnd(-10, 10); }
+      }
+      if (!aim.hit && (cx - rock.x) * aim.dx + (cy - rock.y) * aim.dy <= 0) {
+        aim.hit = true;
+        if (Math.abs((cx - rock.x) * -aim.dy + (cy - rock.y) * aim.dx) < S * .45) burst(); else missed = true;
+      }
+      const o = rock.R * 3;
+      if ((rock.t > .25 && (rock.x < -o || rock.x > W + o || rock.y < -o || rock.y > H + o)) || rock.t > 3.5) { if (!aim.hit) missed = true; setMode('AWAY'); }
+    }
+  },
+  AWAY: {
+    up() {
+      rock.vx = rock.vy = 0;
+      if (rock.t > 1.5) {
+        if (missed) { say(aim.clip ? 'R.O.C.K. mostly missed.' : 'R.O.C.K. missed.'); forceHit = true; }
+        else say(pick([shape.n + ' destroyed.  R.O.C.K. regrets nothing.', shape.n + ' destroyed.  It was in the way.', shape.n + ' is debris again.  Work resumes.', 'Impact confirmed.  ' + shape.n + ' no longer exists.']));
+        const e = (Math.random() * 4) | 0, m = rock.R * 3;
+        rock.x = e === 0 ? -m : e === 1 ? W + m : rnd(W); rock.y = e === 2 ? -m : e === 3 ? H + m : e < 2 ? rnd(H) : rock.y;
+        if (e >= 2) rock.x = rnd(W);
+        eye('open'); setMode('RETURN');
+      }
+    }
+  },
+  RETURN: {
+    go() { rock.dx = rnd(W * .2, W * .8); rock.dy = rnd(H * .2, H * .8); },
+    up(dt) { if (arrive(rock.dx, rock.dy, SPD * .55, dt, 3) < 16 || rock.t > 7) { if (missed) { bubble('...', 1.6); missed = false; } resume(); } }
+  },
+  LOITER: {
+    go() { rock.dx = rnd(W * .15, W * .85); rock.dy = rnd(H * .2, H * .8); rock.ph = rnd(2.2, 4); },
+    up(dt) { arrive(rock.dx, rock.dy, SPD * .35, dt, 3); if (rock.t > rock.ph) { newShape(); setMode('BUILD'); } }
+  },
+  LEAVE: {
+    go() { rock.dx = rock.x < W / 2 ? W * .85 : W * .15; rock.dy = rnd(H * .15, H * .85); },
+    up(dt) {
+      arrive(rock.dx, rock.dy, SPD * .4, dt, 3);
+      if (rock.t > 6) {
+        for (const p of pieces) if (p.as) { p.as = false; p.st = 0; p.vx = rnd(-22, 22); p.vy = rnd(-22, 22); }
+        alive = false; leaving = false; say(shape.n + ' drifted apart on its own.'); setMode('LOITER');
+      }
+    }
+  },
+  NAP: {
+    go() { napDur = rnd(7, 11); eye('closed'); bubble('z z', napDur); say('R.O.C.K. is resting.  Rocks are always resting.'); },
+    up(dt) { brake(dt); if (rock.t > napDur) { eye('open'); bubble('!', 1); resume(); } }
+  },
+  SCAN: {
+    go() { const c = pieces.filter(p => p.st === 0 && p.x > 30 && p.x < W - 30 && p.y > 30 && p.y < H - 30); scanP = c.length ? pick(c) : pieces[0]; },
+    up(dt) {
+      const p = scanP, dx = rock.x - p.x, dy = rock.y - p.y, d = hyp(dx, dy) || 1, g = rock.R * 2.7;
+      if (rock.ph === 0) { if (arrive(p.x + dx / d * g, p.y + dy / d * g, SPD * .7, dt) < 12 || rock.t > 3.5) { rock.ph = 1; rock.t = 0; tone(900, .05); } }
+      else {
+        brake(dt); rock.face = p.x >= rock.x ? 1 : -1; lookAt(p.x, p.y, .2);
+        if (rock.t > 2.6) { say(pick(['Scan complete.  Result: rock.', 'Scan complete.  Nothing found.  Rescan scheduled for never.', 'Scan complete.  Object is debris.  R.O.C.K. approves.'])); bubble(pick(['?', '!', '...']), 1.6); tone(1200, .06); scanP = null; resume(); }
+      }
+    }
+  },
+  STARE: {
+    go() { rock.dx = W * rnd(.35, .65); rock.dy = H * .6; },
+    up(dt) {
+      if (rock.ph === 0) { if (arrive(rock.dx, rock.dy, SPD * .8, dt) < 14 || rock.t > 3) { rock.ph = 1; rock.t = 0; say('R.O.C.K. is looking at you.'); eye('wide', .6); } }
+      else if (rock.ph === 1) { brake(dt); rock.sc += (2.2 - rock.sc) * Math.min(1, dt * 4); if (rock.t > 3.4) { rock.ph = 2; rock.t = 0; } }
+      else { rock.sc += (1 - rock.sc) * Math.min(1, dt * 6); if (rock.t > .7) resume(); }
+    }
+  },
+  HELD: {
+    go() { eye('dizzy'); rock.bub = null; },
+    up(dt) { const f = Math.min(1, dt * 20); rock.x += (ptr.x - rock.x) * f; rock.y += (ptr.y - rock.y) * f; rock.vx = rock.vy = 0; rock.rot = Math.sin(now * 11) * .14 + clamp(ptr.vx * .0004, -.5, .5); }
+  },
+  TUMBLE: {
+    up(dt) {
+      const f = Math.exp(-1.5 * dt), m = rock.R; rock.vx *= f; rock.vy *= f;
+      if (rock.x < m && rock.vx < 0) rock.vx *= -.6; if (rock.x > W - m && rock.vx > 0) rock.vx *= -.6;
+      if (rock.y < m && rock.vy < 0) rock.vy *= -.6; if (rock.y > H - m && rock.vy > 0) rock.vy *= -.6;
+      rock.rot += rock.rv * dt; rock.rv *= Math.exp(-1.3 * dt);
+      if (rock.t > 1 && hyp(rock.vx, rock.vy) < 90) {
+        const tg = Math.round(rock.rot / TAU) * TAU; rock.rv = 0; rock.rot += (tg - rock.rot) * Math.min(1, dt * 7);
+        if (Math.abs(tg - rock.rot) < .04) { rock.rot = 0; eye('open'); bubble(pick(['...', '!', '?']), 1.4); resume(); }
+      }
+      if (rock.t > 6) { rock.rot = 0; eye('open'); resume(); }
+    }
+  }
+};
+function event() {
+  const opts = ['NAP', 'SCAN', 'SCAN', 'STARE'];
+  if (rock.mode === 'BUILD' && placedN() > 4) opts.push('RUN', 'RUN', 'RUN');
+  const e = pick(opts);
+  if (e !== 'RUN') return setMode(e);
+  const p = pick(pieces.filter(q => q.as && q.st === 2)), dx = p.x - cx, dy = p.y - cy, d = hyp(dx, dy) || 1;
+  p.st = 0; p.vx = dx / d * 150 + rnd(-40, 40); p.vy = dy / d * 150 + rnd(-40, 40); p.va = rnd(-6, 6); cur = p; stepT = 0;
+  say('One piece is not cooperating.'); bubble('...', 1.5); eye('squint', 1.5);
+}
+
+/* ---------- one tick of the simulation ---------- */
+function update(dt) {
+  now += dt;
+  const r = rock, pvx = r.vx;
+  r.t += dt; r.jit = 0; if (pauseT > 0) pauseT -= dt;
+  MODES[r.mode].up(dt);
+  r.x += r.vx * dt; r.y += r.vy * dt;
+  if ((r.mode === 'BUILD' || r.mode === 'LOITER') && pauseT <= 0) {
+    evT -= dt; if (evT <= 0) { evT = rnd(24, 48); event(); }
+    idleT -= dt; if (idleT <= 0) { idleT = rnd(28, 50); if (r.mode === 'BUILD' && now - lastSay > 12) say(pick(IDLE)); }
+  }
+  const sp = hyp(r.vx, r.vy), charging = r.mode === 'WINDUP' && r.ph === 1;
+  if (r.mode !== 'HELD' && r.mode !== 'TUMBLE' && !charging && Math.abs(r.vx) > 25) r.face = r.vx > 0 ? 1 : -1;
+  r.fx += (r.face - r.fx) * Math.min(1, dt * 14);
+  if (r.mode !== 'STARE') r.sc += (1 - r.sc) * Math.min(1, dt * 8);
+  const tt = r.mode === 'NAP' ? .04 : r.mode === 'ROCKET' || charging ? 1 : r.mode === 'HELD' ? .1 : clamp(.3 + sp / SPD * .6, .3, .9);
+  r.thr += (tt - r.thr) * Math.min(1, dt * 6);
+  const ax = (r.vx - pvx) / Math.max(dt, .001) * r.face;
+  r.antV += (-r.ant * 60 - r.antV * 6 - ax * .0016) * dt; r.ant = clamp(r.ant + r.antV * dt, -.7, .7);
+  if (r.eyeT > 0) { r.eyeT -= dt; if (r.eyeT <= 0) r.eye = 'open'; }
+  r.nb -= dt; if (r.nb <= 0) { r.blink = .13; r.nb = rnd(1.6, 5); } if (r.blink > 0) r.blink -= dt;
+  if (r.bubT > 0) { r.bubT -= dt; if (r.bubT <= 0) r.bub = null; }
+  let lx = 0, ly = 0; const seen = now - ptr.seen;
+  if (lookT > 0 && lookP) { lookT -= dt; const dx = lookP.x - r.x, dy = lookP.y - r.y, d = hyp(dx, dy) || 1; lx = dx / d; ly = dy / d; }
+  else if (r.mode === 'STARE' && r.ph === 1) { lx = 0; ly = 0; }
+  else if (sp > 30) { lx = r.vx / sp; ly = r.vy / sp; }
+  else if (seen < 3) { const dx = ptr.x - r.x, dy = ptr.y - r.y, d = hyp(dx, dy) || 1; lx = dx / d; ly = dy / d; }
+  r.lx += (lx - r.lx) * Math.min(1, dt * 9); r.ly += (ly - r.ly) * Math.min(1, dt * 9);
+  const da = seen < 4 ? Math.atan2(ptr.y - r.y, (ptr.x - r.x) * r.face) : -1.1 + Math.sin(now * .7) * .5;
+  let dd = da - r.dish; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); r.dish += dd * Math.min(1, dt * 4);
+
+  const cr = r.R * .85 * r.sc, bump = r.mode !== 'AWAY';
+  for (const p of pieces) {
+    if (p.st === 1) {
+      const dx = p.tx - p.x, dy = p.ty - p.y;
+      p.vx += (dx * 16 - p.vx * 7) * dt; p.vy += (dy * 16 - p.vy * 7) * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.va * dt; p.va *= Math.exp(-2 * dt);
+      if (dx * dx + dy * dy < 3 && p.vx * p.vx + p.vy * p.vy < 150) { p.st = 2; p.x = p.tx; p.y = p.ty; p.vx = p.vy = 0; p.pop = 1; p.va = rnd(-.25, .25); tone(1200 + rnd(300), .02, 'square', .008); }
+    } else if (p.st === 2) { p.a += p.va * dt; if (p.pop > 0) p.pop -= dt * 4; }
+    else {
+      p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.va * dt;
+      const ps = hyp(p.vx, p.vy);
+      if (ps > 18) { const f = Math.exp(-1.7 * dt); p.vx *= f; p.vy *= f; } else if (ps < 6) { p.vx += rnd(-30, 30) * dt; p.vy += rnd(-30, 30) * dt; }
+      if (Math.abs(p.va) > 1) p.va *= Math.exp(-1.2 * dt);
+      const m = p.r + 2;
+      if (p.x < m && p.vx < 0) p.vx *= -.7; if (p.x > W - m && p.vx > 0) p.vx *= -.7; if (p.y < m && p.vy < 0) p.vy *= -.7; if (p.y > H - m && p.vy > 0) p.vy *= -.7;
+      p.x = clamp(p.x, -80, W + 80); p.y = clamp(p.y, -80, H + 80);
+      if (bump && p !== cur) {
+        const dx = p.x - r.x, dy = p.y - r.y, d = hyp(dx, dy), rr = cr + p.r;
+        if (d < rr && d > .01) { const nx = dx / d, ny = dy / d, rel = (r.vx - p.vx) * nx + (r.vy - p.vy) * ny; p.x = r.x + nx * rr; p.y = r.y + ny * rr; if (rel > 0) { p.vx += nx * rel * 1.2; p.vy += ny * rel * 1.2; p.va += rnd(-3, 3); } }
+      }
+    }
+  }
+  for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.l -= dt; if (q.l <= 0) { parts.splice(i, 1); continue; } q.x += q.vx * dt; q.y += q.vy * dt; const f = Math.exp(-2 * dt); q.vx *= f; q.vy *= f; }
+  if (parts.length > 260) parts.splice(0, parts.length - 260);
+  for (let i = rings.length - 1; i >= 0; i--) { const q = rings[i]; q.l -= dt; q.r += q.v * dt; if (q.l <= 0) rings.splice(i, 1); }
+  for (const s of stars) { s.x -= 2.2 * dt; if (s.x < -2) { s.x = W + 2; s.y = rnd(H); } }
+  shake *= Math.exp(-5 * dt); if (shake < .02) shake = 0;
+}
+
+/* ---------- drawing ---------- */
+function rr(x, y, w, h, r) { X.beginPath(); X.moveTo(x + r, y); X.arcTo(x + w, y, x + w, y + h, r); X.arcTo(x + w, y + h, x, y + h, r); X.arcTo(x, y + h, x, y, r); X.arcTo(x, y, x + w, y, r); X.closePath(); }
+const BODY = [[-34, 2], [-28, -18], [-12, -30], [10, -32], [28, -22], [36, -4], [32, 16], [16, 27], [-10, 29], [-28, 20]];
+const TOP = [[-28, -18], [-12, -30], [10, -32], [28, -22], [13, -13], [-14, -11]];
+const SIDE = [[28, -22], [36, -4], [32, 16], [16, 27], [22, 4]];
+function drawRock() {
+  const r = rock, k = r.R / 40 * r.sc, bob = Math.sin(now * 2.3) * 2.2 * (r.mode === 'NAP' ? .35 : 1);
+  const jx = r.jit ? rnd(-1, 1) * r.jit * 2.4 : 0, jy = r.jit ? rnd(-1, 1) * r.jit * 2.4 : 0, fx = Math.abs(r.fx) < .08 ? (r.fx < 0 ? -.08 : .08) : r.fx;
+  X.save(); X.translate(r.x + jx, r.y + jy + bob * k); X.rotate(r.rot); X.scale(k * fx, k);
+  X.lineJoin = 'round'; X.lineCap = 'round'; X.strokeStyle = '#fff';
+  X.save(); X.translate(-14, -28); X.rotate(-.18 + r.ant); X.lineWidth = 2.4; X.beginPath(); X.moveTo(0, 0); X.lineTo(0, -22); X.stroke(); X.fillStyle = '#fff'; X.beginPath(); X.arc(0, -24, 3.2, 0, TAU); X.fill(); X.restore();
+  X.save(); X.translate(-27, -20); X.lineWidth = 2.4; X.beginPath(); X.moveTo(0, 0); X.lineTo(-8, -12); X.stroke(); X.translate(-8, -12); X.rotate(r.dish);
+  X.fillStyle = '#000'; X.lineWidth = 2; X.beginPath(); X.ellipse(0, 0, 3.5, 10, 0, 0, TAU); X.fill(); X.stroke(); X.beginPath(); X.moveTo(0, 0); X.lineTo(9, 0); X.stroke(); X.fillStyle = '#fff'; X.beginPath(); X.arc(10, 0, 2, 0, TAU); X.fill(); X.restore();
+  for (const [px, py] of [[-22, 30], [2, 34], [24, 30]]) {
+    X.lineWidth = 2.4; X.beginPath(); X.moveTo(px * .8, 22); X.lineTo(px, py); X.stroke();
+    X.fillStyle = '#000'; X.lineWidth = 2; X.beginPath(); X.ellipse(px, py + 3, 9, 5, 0, 0, TAU); X.fill(); X.stroke();
+    if (r.thr > .12) { X.fillStyle = '#fff'; X.beginPath(); X.ellipse(px, py + 4.5, 6 * Math.min(1, r.thr + .3), 1.8, 0, 0, TAU); X.fill(); }
+    if (r.thr > .2) { const L = r.thr * (5 + rnd(5)); X.lineWidth = 1.6; X.beginPath(); X.moveTo(px - 4, py + 10); X.lineTo(px - 4, py + 10 + L * .7); X.moveTo(px, py + 10); X.lineTo(px, py + 10 + L); X.moveTo(px + 4, py + 10); X.lineTo(px + 4, py + 10 + L * .7); X.stroke(); }
+  }
+  X.lineWidth = 2.6; X.fillStyle = PM; poly(X, BODY); X.fill(); X.stroke();
+  X.lineWidth = 1.6; X.fillStyle = PL; poly(X, TOP); X.fill(); X.stroke();
+  X.fillStyle = PD; poly(X, SIDE); X.fill(); X.stroke();
+  X.fillStyle = '#000'; poly(X, [[-30, -1], [-19, -6], [-15, 7], [-26, 11]]); X.fill(); X.stroke();
+  X.fillStyle = '#fff'; X.fillRect(-27, 0, 1.8, 1.8); X.fillRect(-19.5, 5, 1.8, 1.8);
+  X.fillStyle = '#000'; X.fillRect(1, -29, 9, 5); X.strokeRect(1, -29, 9, 5);
+  if (r.mode !== 'NAP' && (now * 1.4) % 1 < .5) { X.fillStyle = '#fff'; X.fillRect(3, -27.6, 5, 2.2); }
+  X.lineWidth = 2.6; X.fillStyle = '#000'; rr(-12, -8, 40, 22, 6); X.fill(); X.stroke();
+  const ex = clamp(r.lx * (r.fx < 0 ? -1 : 1), -1, 1) * 3.4, ey = clamp(r.ly, -1, 1) * 2.4, e = r.blink > 0 && r.eye === 'open' ? 'blink' : r.eye;
+  X.fillStyle = '#fff'; X.lineWidth = 2.4;
+  for (const bx of [-5, 12]) {
+    const x0 = bx + ex, y0 = -4 + ey;
+    if (e === 'open') { rr(x0, y0, 8.5, 13, 3); X.fill(); }
+    else if (e === 'wide') { rr(x0 - 1, y0 - 1.5, 10.5, 16, 4); X.fill(); }
+    else if (e === 'squint') { rr(x0 - .5, y0 + 4.5, 9.5, 4.5, 2); X.fill(); }
+    else if (e === 'happy') { X.beginPath(); X.arc(x0 + 4.2, y0 + 9, 4.6, Math.PI, TAU); X.stroke(); }
+    else if (e === 'dizzy') { X.beginPath(); X.moveTo(x0, y0 + 2); X.lineTo(x0 + 8.5, y0 + 11); X.moveTo(x0 + 8.5, y0 + 2); X.lineTo(x0, y0 + 11); X.stroke(); }
+    else { X.beginPath(); X.moveTo(x0, y0 + 7); X.lineTo(x0 + 8.5, y0 + 7); X.stroke(); }
+  }
+  X.restore();
+}
+function drawBubble() {
+  const r = rock; if (!r.bub) return;
+  const w = 48, h = 32, bx = clamp(r.x + r.R * .7 * r.sc, 6, W - w - 6), by = clamp(r.y - r.R * 1.3 * r.sc - h - 10, 6, H - h - 16);
+  X.lineWidth = 2.2; X.strokeStyle = '#fff'; X.fillStyle = '#000'; X.lineJoin = 'round';
+  X.beginPath(); X.moveTo(bx + 10, by + h - 1); X.lineTo(bx + 4, by + h + 9); X.lineTo(bx + 22, by + h - 1); X.fill(); X.stroke();
+  X.fillRect(bx, by, w, h); X.strokeRect(bx, by, w, h); X.fillRect(bx + 11.5, by + h - 2, 9, 3.5);
+  X.fillStyle = '#fff';
+  if (r.bub === 'heart') { X.save(); X.translate(bx + w / 2 - 10, by + h / 2 - 10.5); X.scale(.2, .2); heart(X); X.restore(); }
+  else { X.font = 'bold 20px "Chakra Petch",Arial,sans-serif'; X.textAlign = 'center'; X.textBaseline = 'middle'; X.fillText(r.bub, bx + w / 2, by + h / 2 + 1); }
+}
+function drawScan() {
+  if (rock.mode !== 'SCAN' || rock.ph !== 1 || !scanP) return;
+  const r = rock, p = scanP, ox = r.x + r.fx * r.R * .25, oy = r.y, a = Math.atan2(p.y - oy, p.x - ox), d = hyp(p.x - ox, p.y - oy) * 1.15, sw = .2, s = a + Math.sin(now * 7) * sw, b = p.r + 9;
+  X.save(); X.strokeStyle = '#fff'; X.lineWidth = 1.2; X.setLineDash([3, 5]);
+  X.beginPath(); X.moveTo(ox, oy); X.lineTo(ox + Math.cos(a - sw) * d, oy + Math.sin(a - sw) * d); X.moveTo(ox, oy); X.lineTo(ox + Math.cos(a + sw) * d, oy + Math.sin(a + sw) * d); X.stroke();
+  X.setLineDash([]); X.lineWidth = 2; X.beginPath(); X.moveTo(ox, oy); X.lineTo(ox + Math.cos(s) * d, oy + Math.sin(s) * d);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { X.moveTo(p.x + sx * b, p.y + sy * (b - 6)); X.lineTo(p.x + sx * b, p.y + sy * b); X.lineTo(p.x + sx * (b - 6), p.y + sy * b); }
+  X.stroke(); X.restore();
+}
+function draw() {
+  X.setTransform(DPR, 0, 0, DPR, 0, 0); X.fillStyle = '#000'; X.fillRect(0, 0, W, H);
+  if (shake) X.translate(rnd(-1, 1) * shake * 9, rnd(-1, 1) * shake * 9);
+  X.fillStyle = '#fff'; for (const s of stars) if (Math.sin(now * s.tw + s.ph) > -.55) X.fillRect(s.x | 0, s.y | 0, s.s, s.s);
+  X.strokeStyle = '#fff'; X.setLineDash([6, 7]);
+  for (const q of rings) { X.lineWidth = Math.max(1, q.l * 5); X.beginPath(); X.arc(q.x, q.y, q.r, 0, TAU); X.stroke(); }
+  X.setLineDash([]); X.lineJoin = 'round';
+  for (const p of pieces) {
+    const pr = p.r * (p.st === 2 ? 1.22 + Math.max(0, p.pop) * .5 : 1), fy = p.st === 2 ? Math.sin(now * 1.3 + p.ph) * 1.1 : 0;
+    X.save(); X.translate(p.x, p.y + fy); X.rotate(p.a); X.beginPath();
+    for (let i = 0; i < p.pts.length; i++) { const q = p.pts[i]; if (i) X.lineTo(q[0] * pr, q[1] * pr); else X.moveTo(q[0] * pr, q[1] * pr); }
+    X.closePath(); X.fillStyle = p.st === 2 ? '#fff' : p.st === 1 ? PM : '#000'; X.fill(); X.lineWidth = 1.5; X.strokeStyle = '#fff'; X.stroke();
+    if (p.st === 0) { X.lineWidth = 1; X.beginPath(); X.moveTo(p.pts[0][0] * pr * .8, p.pts[0][1] * pr * .8); X.lineTo(0, 0); X.stroke(); }
+    X.restore();
+  }
+  X.fillStyle = '#fff'; for (const q of parts) { const s = q.s * Math.min(1, q.l / q.m * 1.4); X.fillRect(q.x - s / 2, q.y - s / 2, s, s); }
+  drawScan();
+  if (rock.mode !== 'AWAY') { drawRock(); drawBubble(); }
+}
+
+/* ---------- touch, mouse, keys ---------- */
+const grabbable = () => rock.mode !== 'ROCKET' && rock.mode !== 'AWAY';
+function undone() { if (alive && !leaving && now - tapSayT > 9) { tapSayT = now; say(pick(['Someone is undoing the work.  R.O.C.K. does not mind.', 'Outside interference detected.  R.O.C.K. will fix it.', 'The work was disturbed.  The work continues.'])); } }
+function pulse(x, y) {
+  const PRAD = clamp(U * .2, 70, 150), can = rock.mode !== 'ROCKET'; let loose = 0;
+  rings.push({ x, y, r: 6, v: PRAD * 2.6, l: .4 });
+  for (const p of pieces) {
+    const dx = p.x - x, dy = p.y - y, d = hyp(dx, dy); if (d > PRAD) continue;
+    const k = 1 - d / PRAD, nx = d > .01 ? dx / d : rnd(-1, 1), ny = d > .01 ? dy / d : rnd(-1, 1);
+    if (p.st && p.as && can && d < PRAD * .5) { p.st = 0; loose++; }
+    if (!p.st) { p.vx += nx * k * 340; p.vy += ny * k * 340; p.va += rnd(-5, 5) * k; }
+  }
+  tone(300, .06, 'square', .03, 160); lookAt(x, y, 1.6);
+  if (loose) { undone(); if (rock.mode === 'BUILD' || rock.mode === 'ADMIRE') { bubble(pick(['...', '?']), 1.2); eye('squint', 1.2); } }
+  else if (grabbable() && rock.mode !== 'NAP' && rock.mode !== 'HELD' && rock.mode !== 'TUMBLE' && Math.random() < .5) bubble('?', 1);
+}
+function stir(x, y) {
+  if (hyp(ptr.vx, ptr.vy) < 40) return;
+  const vx = clamp(ptr.vx, -900, 900), vy = clamp(ptr.vy, -900, 900); let loose = 0;
+  for (const p of pieces) {
+    const d = hyp(p.x - x, p.y - y); if (d > 52) continue;
+    if (p.st && p.as && d < 26 && rock.mode !== 'ROCKET') { p.st = 0; loose++; }
+    if (!p.st) { p.vx += (vx * .5 - p.vx) * .35; p.vy += (vy * .5 - p.vy) * .35; p.va += rnd(-2, 2); }
+  }
+  if (loose) undone();
+}
+function poke() {
+  stats.poked++; save(); tone(880, .07); setTimeout(() => tone(1320, .09), 80);
+  if (rock.mode === 'NAP') { say('R.O.C.K. is awake.  The nap is classified.'); eye('wide', .8); bubble('!', 1.2); return resume(); }
+  bubble(pick(['!', '?', 'heart', '...', ':)', '!']), 1.6); if (rock.eye === 'open') eye('wide', .7); pauseT = .9; rock.vy -= 60;
+  if (now - pokeSayT > 10) { pokeSayT = now; say(pick(['R.O.C.K. was poked.  R.O.C.K. did nothing.', 'Poke registered.  No action taken.', 'R.O.C.K. acknowledges the poke.  Probably.', 'Contact detected.  R.O.C.K. remains a rock.'])); }
+}
+function release() {
+  const stale = performance.now() - ptr.lt > 90;
+  rock.vx = stale ? 0 : clamp(ptr.vx, -1500, 1500); rock.vy = stale ? 0 : clamp(ptr.vy, -1500, 1500); rock.rv = clamp(rock.vx * .012, -14, 14) + rnd(-2, 2);
+  setMode('TUMBLE');
+  if (now - holdSayT > 8) { holdSayT = now; say(pick(['R.O.C.K. has been relocated.  He will be back.', 'R.O.C.K. was thrown.  R.O.C.K. has no comment.', 'Unscheduled flight complete.'])); }
+}
+let hudTimer = 0, helpOpen = false;
+function wakeHud() { document.body.classList.remove('quiet'); clearTimeout(hudTimer); hudTimer = setTimeout(() => { if (!helpOpen) document.body.classList.add('quiet'); }, 3500); }
+let wl = null;
+async function wake() {
+  try { if ('wakeLock' in navigator && !wl && document.visibilityState === 'visible') { wl = await navigator.wakeLock.request('screen'); $('wl').textContent = 'STAY AWAKE: ON'; wl.addEventListener('release', () => { wl = null; $('wl').textContent = 'STAY AWAKE: OFF'; }); } } catch (e) {}
+}
+C.addEventListener('pointerdown', e => {
+  if (ptr.down) return;
+  ptr.down = true; ptr.id = e.pointerId; try { C.setPointerCapture(e.pointerId); } catch (_) {}
+  ptr.x = ptr.sx = e.clientX; ptr.y = ptr.sy = e.clientY; ptr.vx = ptr.vy = 0; ptr.moved = false; ptr.lt = performance.now(); ptr.seen = now;
+  wakeHud(); wake();
+  ptr.grab = grabbable() && hyp(ptr.x - rock.x, ptr.y - rock.y) < rock.R * rock.sc * 1.4 + 12;
+  if (!ptr.grab) pulse(ptr.x, ptr.y);
+});
+C.addEventListener('pointermove', e => {
+  const t = performance.now(); ptr.seen = now; wakeHud();
+  if (ptr.down && e.pointerId === ptr.id) {
+    const dt = Math.max(1, t - ptr.lt) / 1000, nx = e.clientX, ny = e.clientY;
+    ptr.vx = ptr.vx * .5 + (nx - ptr.x) / dt * .5; ptr.vy = ptr.vy * .5 + (ny - ptr.y) / dt * .5; ptr.x = nx; ptr.y = ny; ptr.lt = t;
+    if (!ptr.moved && hyp(nx - ptr.sx, ny - ptr.sy) > 10) { ptr.moved = true; if (ptr.grab && grabbable()) setMode('HELD'); }
+    if (!ptr.grab) stir(nx, ny);
+  } else if (!ptr.down) { ptr.x = e.clientX; ptr.y = e.clientY; }
+});
+function pointerUp(e) {
+  if (!ptr.down || e.pointerId !== ptr.id) return;
+  ptr.down = false;
+  if (ptr.grab) { if (rock.mode === 'HELD') release(); else if (!ptr.moved && grabbable()) poke(); }
+  ptr.grab = false;
+}
+C.addEventListener('pointerup', pointerUp); C.addEventListener('pointercancel', pointerUp);
+C.addEventListener('contextmenu', e => e.preventDefault());
+function fullScreen() {
+  try {
+    const d = document, el = d.documentElement;
+    if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else { const f = el.requestFullscreen || el.webkitRequestFullscreen; if (!f) return say('Full screen is not available in this browser.'); const p = f.call(el); if (p && p.catch) p.catch(() => say('Full screen was refused by this viewer.')); }
+  } catch (e) {}
+}
+function toggleSound() {
+  snd = !snd;
+  if (snd) { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { snd = false; } }
+  $('bSnd').textContent = 'SOUND: ' + (snd ? 'ON' : 'OFF'); tone(880, .06); setTimeout(() => tone(1320, .08), 70);
+}
+function toggleHelp() { helpOpen = !helpOpen; $('help').hidden = !helpOpen; wakeHud(); }
+function smashNow() { if (alive && grabbable() && rock.mode !== 'WINDUP' && rock.mode !== 'HELD' && rock.mode !== 'TUMBLE') { forceHit = true; leaving = false; setMode('WINDUP'); } }
+function skipShape() { if (grabbable() && rock.mode !== 'HELD' && rock.mode !== 'TUMBLE') { rock.sc = 1; eye('open'); newShape(); setMode('BUILD'); } }
+$('bFull').addEventListener('click', fullScreen); $('bSnd').addEventListener('click', toggleSound); $('bHelp').addEventListener('click', toggleHelp); $('bClose').addEventListener('click', toggleHelp);
+$('help').addEventListener('click', e => { if (e.target === $('help')) toggleHelp(); });
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase(); wakeHud();
+  if (k === ' ') { e.preventDefault(); smashNow(); } else if (k === 'n') skipShape(); else if (k === 'f') fullScreen(); else if (k === 'm') toggleSound(); else if (k === 'h') toggleHelp(); else if (k === 'escape' && helpOpen) toggleHelp();
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
+addEventListener('resize', resize); addEventListener('orientationchange', () => setTimeout(resize, 250));
+
+/* ---------- go ---------- */
+let last = 0, errs = 0;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  if (document.hidden) { last = ts; return; }
+  const el = ts - last; if (el < 14) return; last = ts;
+  try { update(Math.min(el / 1000, .05)); draw(); }
+  catch (e) { if (errs++ < 3) console.error(e); for (const p of pieces) { p.as = false; p.st = 0; } alive = false; cur = null; scanP = null; rock.sc = 1; rock.rot = 0; rock.mode = 'LOITER'; rock.t = 0; rock.ph = 2; }
+}
+resize(); rock.y = H * .5; rock.x = -rock.R * 3; setMode('ENTER'); save(); say('R.O.C.K. IDLER v' + VERSION + ' online.'); wakeHud(); wake();
+if (location.hash === '#debug') window.ROCK = { rock, pieces, stats, smashNow, skipShape, event, setMode, get shape() { return shape && shape.n; }, get alive() { return alive; }, get now() { return now; } };
+requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
