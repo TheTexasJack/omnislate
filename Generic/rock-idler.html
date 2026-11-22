@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<title>R.O.C.K. Idler v1.0</title>
+<title>R.O.C.K. Idler v1.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -46,11 +46,13 @@ body:not(.quiet) #hud button{pointer-events:auto}
 </style>
 </head>
 <body class="quiet">
-<canvas id="c" aria-label="R.O.C.K., a small rock-shaped robot, pushing floating debris into shapes and then smashing them"></canvas>
+<canvas id="c" aria-label="R.O.C.K., a small rock-shaped robot, pushing floating debris into shapes, smashing them, setting off mines and scanning decoys"></canvas>
 <div id="scan"></div>
 <div id="hud">
-  <div class="id"><b>R.O.C.K. IDLER v1.0</b><span id="stats"></span><span id="wl">STAY AWAKE: OFF</span></div>
+  <div class="id"><b>R.O.C.K. IDLER v1.1</b><span id="stats"></span><span id="wl">STAY AWAKE: OFF</span></div>
   <div class="btns">
+    <button id="bDecoy" type="button">SEND DECOY</button>
+    <button id="bMine" type="button">DROP MINE</button>
     <button id="bFull" type="button">FULL SCREEN</button>
     <button id="bSnd" type="button">SOUND: OFF</button>
     <button id="bHelp" type="button">HELP</button>
@@ -59,13 +61,16 @@ body:not(.quiet) #hud button{pointer-events:auto}
 <div id="st" aria-live="polite"><span id="stx"></span></div>
 <div id="help" hidden>
   <div>
-    <h1>R.O.C.K. IDLER v1.0</h1>
+    <h1>R.O.C.K. IDLER v1.1</h1>
     <p>R.O.C.K. builds a shape out of debris, admires it, then smashes it.  Then he does it again.  That is the whole job.</p>
     <ul>
       <li>Tap R.O.C.K. to poke him.</li>
       <li>Drag R.O.C.K. to carry him.  Let go to throw him.</li>
       <li>Tap or swipe the debris to stir it up.  Yes, you can undo his work.</li>
-      <li>Keyboard: Space smashes now.  N starts a new shape.  F is full screen.  M is sound.  H is this panel.</li>
+      <li>Mines drift in.  R.O.C.K. clears them with his face.  Tap a mine to set it off yourself.</li>
+      <li>Pirate mech contacts show up.  R.O.C.K. scans them.  They are decoys.  Tap one to dispel it.</li>
+      <li>SEND DECOY and DROP MINE call them in on demand.</li>
+      <li>Keyboard: Space smashes now.  N starts a new shape.  D sends a decoy.  X drops a mine.  F is full screen.  M is sound.  H is this panel.</li>
       <li>Add your own short words to the address: <code>rock-idler.html?words=GG,HI</code></li>
       <li>The screen stays awake while this page is open, where the browser allows it.</li>
     </ul>
@@ -80,7 +85,7 @@ body:not(.quiet) #hud button{pointer-events:auto}
    You can also add words in the address bar:  rock-idler.html?words=GG,RA
    =========================================== */
 const CUSTOM_WORDS = [];
-const VERSION = '1.0';
+const VERSION = '1.1';
 
 const TAU = Math.PI * 2;
 const rnd = (a, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
@@ -97,6 +102,7 @@ function mkPat(n, fn) { const p = document.createElement('canvas'); p.width = p.
 const PL = mkPat(3, g => { g.fillStyle = '#fff'; g.fillRect(0, 0, 3, 3); g.fillStyle = '#000'; g.fillRect(0, 0, 1, 1); });
 const PM = mkPat(4, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 4, 4); g.fillStyle = '#fff'; g.fillRect(0, 0, 2, 2); g.fillRect(2, 2, 2, 2); });
 const PD = mkPat(5, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 5, 5); g.fillStyle = '#fff'; g.fillRect(0, 0, 1.5, 1.5); });
+const PH = mkPat(4, g => { g.fillStyle = '#fff'; g.fillRect(0, 0, 4, 1); });
 
 /* ---------- shapes: each one is drawn on a 100 x 100 card, then sampled into points ---------- */
 const poly = (g, pts) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); };
@@ -115,6 +121,7 @@ const SHAPES = [
   { n: 'SKULL', w: .35, d: g => { g.beginPath(); g.arc(50, 40, 34, 0, TAU); g.fill(); g.fillRect(32, 62, 36, 28); cut(g, () => { g.beginPath(); g.arc(36, 42, 10, 0, TAU); g.moveTo(74, 42); g.arc(64, 42, 10, 0, TAU); g.fill(); poly(g, [[50, 54], [45, 64], [55, 64]]); g.fill(); g.fillRect(42.5, 78, 3, 12); g.fillRect(54.5, 78, 3, 12); }); } },
   { n: 'PLANET', w: 1, d: g => { g.beginPath(); g.arc(50, 50, 25, 0, TAU); g.fill(); g.lineWidth = 7; g.beginPath(); g.ellipse(50, 50, 47, 13, -.4, 0, TAU); g.stroke(); } },
   { n: 'FISH', w: .8, d: g => { g.beginPath(); g.ellipse(42, 50, 32, 21, 0, 0, TAU); g.fill(); poly(g, [[66, 50], [96, 26], [96, 74]]); g.fill(); cut(g, () => { g.beginPath(); g.arc(26, 44, 5, 0, TAU); g.fill(); }); } },
+  { n: 'CAT', w: 1.6, d: g => { g.beginPath(); g.ellipse(50, 60, 37, 31, 0, 0, TAU); g.fill(); poly(g, [[14, 58], [17, 6], [47, 33]]); g.fill(); poly(g, [[86, 58], [83, 6], [53, 33]]); g.fill(); cut(g, () => { g.beginPath(); g.ellipse(35, 56, 7.5, 10, 0, 0, TAU); g.moveTo(72.5, 56); g.ellipse(65, 56, 7.5, 10, 0, 0, TAU); g.fill(); poly(g, [[50, 72], [44.5, 65], [55.5, 65]]); g.fill(); }); } },
   { n: 'HOUSE', w: .8, d: g => { poly(g, [[50, 6], [96, 46], [4, 46]]); g.fill(); g.fillRect(16, 46, 68, 46); cut(g, () => g.fillRect(41, 62, 18, 30)); } },
   { n: 'SELF PORTRAIT', w: .7, d: g => { poly(g, [[8, 52], [16, 26], [36, 10], [62, 8], [84, 20], [94, 46], [90, 72], [70, 88], [38, 90], [16, 78]]); g.fill(); cut(g, () => g.fillRect(26, 40, 50, 26)); g.fillRect(34, 45, 11, 16); g.fillRect(57, 45, 11, 16); } },
   { n: 'HI', w: 1, d: word('HI') },
@@ -149,9 +156,9 @@ function sample(draw, T) {
 }
 
 /* ---------- saved counters, status line, sound ---------- */
-const stats = { built: 0, smashed: 0, poked: 0 };
+const stats = { built: 0, smashed: 0, poked: 0, mines: 0, decoys: 0 };
 try { const s = JSON.parse(localStorage.getItem('rock-idler') || '{}'); for (const k in stats) if (Number.isFinite(s[k])) stats[k] = Math.max(0, Math.floor(s[k])); } catch (e) {}
-function save() { try { localStorage.setItem('rock-idler', JSON.stringify(stats)); } catch (e) {} statEl.textContent = 'BUILT ' + stats.built + '  SMASHED ' + stats.smashed + '  POKED ' + stats.poked + '  PURPOSE: NONE'; }
+function save() { try { localStorage.setItem('rock-idler', JSON.stringify(stats)); } catch (e) {} statEl.textContent = 'BUILT ' + stats.built + '  SMASHED ' + stats.smashed + '  POKED ' + stats.poked + '\nMINES ' + stats.mines + '  DECOYS ' + stats.decoys + '  PURPOSE: NONE'; }
 let sayTimer = 0, lastSay = -99;
 function say(m) { stx.textContent = '> ' + m; stEl.classList.add('on'); clearTimeout(sayTimer); sayTimer = setTimeout(() => stEl.classList.remove('on'), 7000); lastSay = now; }
 let snd = false, ac = null, nbuf = null;
@@ -163,6 +170,20 @@ let pieces = [], stars = [], parts = [], rings = [], shape = null, lastName = ''
 let alive = false, counted = false, leaving = false, forceHit = false, missed = false, half = false;
 let cur = null, stepT = 0, pauseT = 0, evT = rnd(18, 32), idleT = rnd(26, 44), aim = null, lookP = null, lookT = 0, scanP = null, napDur = 8;
 let tapSayT = -99, pokeSayT = -99, holdSayT = -99;
+let mines = [], decoys = [], mineT = null, dcy = null;
+const MINED = ['Mine cleared.  Method: face.', 'Mine found.  R.O.C.K. is fine.  R.O.C.K. is always fine.', 'Detonation confirmed.  R.O.C.K. felt nothing.', 'Mine removed from service.  You are welcome.', 'Mine located.  Mine no longer located.'];
+const SCANNED = ['Contact scanned.  Result: decoy.', 'Pirate mech scanned.  It is a hologram.  A cheap one.', 'Illusion confirmed.  Rocks are hard to fool.', 'Contact is fake.  R.O.C.K. is real.  Probably.'];
+/* a generic blocky pirate mech, drawn only as a hologram: head, torso, shoulders, arms, blade, hips, legs, feet */
+const MECH = [
+  [[-10, -22], [-8, -36], [8, -36], [10, -22]],
+  [[-22, -22], [22, -22], [16, 10], [-16, 10]],
+  [[-36, -27], [-22, -27], [-22, -12], [-36, -12]], [[22, -27], [36, -27], [36, -12], [22, -12]],
+  [[-34, -12], [-25, -12], [-26, 14], [-33, 14]], [[25, -12], [34, -12], [33, 10], [26, 10]],
+  [[27, 10], [32, 10], [41, 44], [37, 46]],
+  [[-16, 10], [16, 10], [12, 20], [-12, 20]],
+  [[-13, 20], [-3, 20], [-5, 44], [-17, 44]], [[3, 20], [13, 20], [17, 44], [5, 44]],
+  [[-20, 44], [-3, 44], [-3, 50], [-22, 50]], [[3, 44], [20, 44], [22, 50], [3, 50]]
+];
 const rock = { x: -90, y: 0, vx: 0, vy: 0, R: 30, face: 1, fx: 1, rot: 0, rv: 0, sc: 1, lx: 0, ly: 0, eye: 'open', eyeT: 0, blink: 0, nb: 2, bub: null, bubT: 0, thr: .3, ant: 0, antV: 0, dish: -1, jit: 0, mode: 'ENTER', t: 0, ph: 0, dx: 0, dy: 0 };
 const ptr = { x: -9999, y: -9999, down: false, id: -1, vx: 0, vy: 0, lt: 0, seen: -99, grab: false, moved: false, sx: 0, sy: 0 };
 const IDLE = ['R.O.C.K. is still working.  Nobody asked.', 'Work continues.  Purpose: none.', 'Telemetry nominal.  Output: one shape, eventually.', 'R.O.C.K. placed a piece.  It was fine.', 'Progress is being made.  Toward what is unclear.', 'R.O.C.K. remains on task.  The task remains pointless.'];
@@ -182,13 +203,16 @@ function resize() {
   while (pieces.length < N) pieces.push(mkPiece());
   for (const p of pieces) { p.r = PR * p.k; if (p.as) { p.tx = cx + p.nx * S; p.ty = cy + p.ny * S; if (p.st === 2) p.st = 1; } if (p.st === 0) { p.x = clamp(p.x, 0, W); p.y = clamp(p.y, 0, H); } }
   rock.x = clamp(rock.x, -120, W + 120); rock.y = clamp(rock.y, -120, H + 120);
+  for (const m of mines) { m.tx = clamp(m.tx, 20, W - 20); m.ty = clamp(m.ty, 20, H - 20); }
+  for (const q of decoys) { q.tx = clamp(q.tx, 30, W - 30); q.ty = clamp(q.ty, 50, H - 60); }
   stars = []; const sn = clamp(Math.round(W * H / 14000), 30, 130);
   for (let i = 0; i < sn; i++) stars.push({ x: rnd(W), y: rnd(H), s: Math.random() < .2 ? 2 : 1, ph: rnd(TAU), tw: rnd(.4, 1.6) });
 }
-function newShape() {
+function newShape(force) {
   for (const p of pieces) { p.as = false; p.st = 0; }
   const pool = SHAPES.filter(s => s.n !== lastName); let tw = 0; for (const s of pool) tw += s.w;
   let r = Math.random() * tw; shape = pool[0]; for (const s of pool) { r -= s.w; if (r <= 0) { shape = s; break; } }
+  if (force) shape = SHAPES.find(s => s.n === force) || shape;
   lastName = shape.n;
   const norm = sample(shape.d, Math.round(pieces.length * .85)), free = pieces.slice();
   for (const t of norm) {
@@ -220,6 +244,57 @@ function burst() {
   for (let i = 0; i < 28; i++) { const a = rnd(TAU), s = rnd(60, 520); parts.push({ x: cx + rnd(-S, S) * .2, y: cy + rnd(-S, S) * .2, vx: Math.cos(a) * s, vy: Math.sin(a) * s, l: rnd(.4, 1), m: 1, s: rnd(2, 5) }); }
   if (!RM) shake = 1;
   noise(.7, .25); tone(110, .5, 'sine', .2, 38);
+}
+
+/* ---------- mines and pirate mech decoys ---------- */
+const nearest = (list, ok) => { let b = null, bd = 1e18; for (const o of list) { if (ok && !ok(o)) continue; const d = (o.x - rock.x) * (o.x - rock.x) + (o.y - rock.y) * (o.y - rock.y); if (d < bd) { bd = d; b = o; } } return b; };
+const fromEdge = () => { const e = (Math.random() * 4) | 0, m = 80; return e === 0 ? [-m, rnd(H)] : e === 1 ? [W + m, rnd(H)] : e === 2 ? [rnd(W), -m] : [rnd(W), H + m]; };
+function spawnMines(n) {
+  n = Math.min(n, 4 - mines.length); if (n <= 0) return;
+  for (let i = 0; i < n; i++) { const [x, y] = fromEdge(); mines.push({ x, y, vx: 0, vy: 0, tx: rnd(W * .12, W * .88), ty: rnd(H * .14, H * .8), r: clamp(rock.R * .42, 10, 26), a: rnd(TAU), va: rnd(-.6, .6), ph: rnd(TAU), fuse: 0 }); }
+  say(n > 1 ? 'Mines detected.  R.O.C.K. will handle it.' : 'Mine detected.  R.O.C.K. will handle it.');
+}
+function spawnDecoys(n) {
+  n = Math.min(n, 4 - decoys.filter(q => !q.dead).length); if (n <= 0) return;
+  const k = rock.R / 40 * 1.9, w = 78 * k, h = 88 * k;
+  for (let i = 0; i < n; i++) {
+    const [x, y] = fromEdge(); let tx = 0, ty = 0;
+    for (let j = 0; j < 8; j++) { tx = rnd(Math.min(w * .6, W * .45), Math.max(W - w * .6, W * .55)); ty = rnd(Math.min(36 * k + 40, H * .45), Math.max(H - 50 * k - 50, H * .55)); if (!decoys.some(o => !o.dead && Math.abs(o.tx - tx) < w * .9 && Math.abs(o.ty - ty) < h * .8)) break; }
+    decoys.push({ x, y, vx: 0, vy: 0, tx, ty, k, w, h, ph: rnd(TAU), flip: Math.random() < .5 ? -1 : 1, dead: false, dt: 0, scan: false, tag: 'CONTACT ?' });
+  }
+  say(n > 1 ? 'Contacts detected.  Possible pirate mechs.' : 'Contact detected.  Possible pirate mech.');
+}
+function killDecoy(q, how) {
+  if (q.dead) return;
+  q.dead = true; q.dt = 0; q.scan = false; tone(900, .25, 'square', .03, 120);
+  if (how === 'tap') return say('Contact poked by outside party.  It was a hologram.');
+  stats.decoys++; save();
+  if (how === 'scan') { q.tag = 'DECOY'; say(pick(SCANNED)); }
+  else if (how === 'through') say('R.O.C.K. flew through the contact.  The contact was not there.');
+  else if (how === 'rocket') say('R.O.C.K. went through a contact at speed.  It was a decoy.');
+  else say('The blast passed through the contact.  It was a decoy.');
+}
+function detonate(m, by) {
+  const i = mines.indexOf(m); if (i < 0) return;
+  mines.splice(i, 1);
+  const BR = Math.max(rock.R * 3.4, 90);
+  rings.push({ x: m.x, y: m.y, r: m.r, v: BR * 2.6, l: .55 }, { x: m.x, y: m.y, r: 4, v: BR * 1.5, l: .8 });
+  for (let j = 0; j < 30; j++) { const a = rnd(TAU), v = rnd(80, 560); parts.push({ x: m.x, y: m.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, l: rnd(.3, .9), m: .9, s: rnd(2, 6) }); }
+  for (const p of pieces) {
+    const dx = p.x - m.x, dy = p.y - m.y, d = hyp(dx, dy); if (d > BR) continue;
+    const k = 1 - d / BR; if (p.st && p.as && d < BR * .7) p.st = 0;
+    if (!p.st) { p.vx += dx / (d || 1) * k * SPD * 1.7; p.vy += dy / (d || 1) * k * SPD * 1.7; p.va += rnd(-8, 8) * k; }
+  }
+  for (const o of mines) if (!o.fuse && hyp(o.x - m.x, o.y - m.y) < BR) o.fuse = rnd(.12, .3);
+  for (const q of decoys) if (!q.dead && hyp(q.x - m.x, q.y - m.y) < BR + q.w * .3) killDecoy(q, 'blast');
+  if (!RM) shake = Math.max(shake, .8);
+  noise(.6, .22); tone(90, .45, 'sine', .2, 36);
+  rock.antV += 9; rock.blink = .3; stats.mines++; save();
+  if (by === 'tap') say('Mine detonated by outside party.  R.O.C.K. was going to do that.');
+  else if (by === 'rocket') say('R.O.C.K. cleared a mine on the way through.');
+  else if (by === 'rock' && rock.mode === 'MINE') { rock.ph = 3; rock.t = 0; rock.vx = rock.vy = 0; eye('closed', .7); say(pick(MINED)); }
+  else if (by === 'rock' && rock.mode === 'NAP') say('A mine went off next to R.O.C.K.  He slept through it.');
+  else if (by === 'rock') { bubble('!', 1.2); say('Unplanned detonation.  R.O.C.K. is fine.'); }
 }
 
 /* ---------- R.O.C.K.'s brain: one entry per mode ---------- */
@@ -257,7 +332,7 @@ const MODES = {
       if (looseN()) return setMode('BUILD');
       if (rock.ph === 0) {
         if (arrive(rock.dx, rock.dy, SPD * .8, dt) < 14 || rock.t > 4) {
-          rock.ph = 1; rock.t = 0; bubble(pick(['heart', '!', ':)', '...']), 2.4); eye('happy', 2.6);
+          rock.ph = 1; rock.t = 0; bubble(shape.n === 'CAT' ? 'heart' : pick(['heart', '!', ':)', '...']), 2.4); eye('happy', 2.6);
           if (!counted) { counted = true; stats.built++; save(); say(shape.n + ' complete.  R.O.C.K. is admiring it.'); tone(660, .08); tone(990, .16, 'square', .03); }
         }
       } else {
@@ -364,6 +439,37 @@ const MODES = {
       else { rock.sc += (1 - rock.sc) * Math.min(1, dt * 6); if (rock.t > .7) resume(); }
     }
   },
+  MINE: {
+    go() { mineT = null; },
+    up(dt) {
+      if (rock.ph === 3) { brake(dt); if (rock.t > 1.4) { bubble(pick([':)', '!', '...', 'heart']), 1.4); if (mines.length) setMode('MINE'); else resume(); } return; }
+      if (!mineT || mines.indexOf(mineT) < 0) { mineT = nearest(mines); if (!mineT) return resume(); rock.ph = 0; rock.t = 0; }
+      const m = mineT, dx = rock.x - m.x, dy = rock.y - m.y, d = hyp(dx, dy) || 1, g = rock.R * 2.4 + m.r, on = m.x > m.r && m.x < W - m.r && m.y > m.r && m.y < H - m.r;
+      if (rock.ph < 2) {
+        const ad = arrive(clamp(m.x + dx / d * g, rock.R, W - rock.R), clamp(m.y + dy / d * g, rock.R, H - rock.R), SPD * .9, dt);
+        if (rock.ph === 0) { if (on && (ad < 14 || rock.t > 5)) { rock.ph = 1; rock.t = 0; bubble('?', .9); tone(700, .05); } }
+        else { rock.face = m.x >= rock.x ? 1 : -1; lookAt(m.x, m.y, .2); if (rock.t > .9) { rock.ph = 2; rock.t = 0; } }
+      } else { arrive(m.x, m.y, SPD * .8, dt); lookAt(m.x, m.y, .2); if (rock.t > 4) detonate(m, 'rock'); }
+    }
+  },
+  DECOY: {
+    go() { dcy = null; },
+    up(dt) {
+      if (!dcy || (dcy.dead && rock.ph !== 2)) { dcy = nearest(decoys, q => !q.dead); if (!dcy) return resume(); rock.ph = Math.random() < .3 ? 3 : 0; rock.t = 0; }
+      const q = dcy, qy = q.y + 7 * q.k, on = q.x > q.w * .3 && q.x < W - q.w * .3 && qy > q.h * .3 && qy < H - q.h * .3;
+      if (rock.ph < 2) {
+        const sx = rock.x < q.x ? -1 : 1, off = q.w * .5 + rock.R * 2; let px = q.x + sx * off; if (px < rock.R || px > W - rock.R) px = q.x - sx * off;
+        const ad = arrive(clamp(px, rock.R, W - rock.R), clamp(qy, rock.R, H - rock.R), SPD * .8, dt);
+        if (rock.ph === 0) { if (on && (ad < 14 || rock.t > 5)) { rock.ph = 1; rock.t = 0; q.scan = true; tone(900, .05); } }
+        else { rock.face = q.x >= rock.x ? 1 : -1; lookAt(q.x, qy, .2); if (rock.t > 1.6) { killDecoy(q, 'scan'); rock.ph = 2; rock.t = 0; bubble(pick(['!', '...', ':)']), 1.2); } }
+      } else if (rock.ph === 2) { brake(dt); if (rock.t > 1) dcy = null; }
+      else if (!on) { brake(dt); lookAt(q.x, qy, .2); rock.t = 0; }
+      else {
+        arrive(q.x, qy, SPD, dt); lookAt(q.x, qy, .2);
+        if (hyp(rock.x - q.x, rock.y - qy) < q.w * .3 || rock.t > 4) { killDecoy(q, 'through'); rock.ph = 2; rock.t = 0; bubble(pick(['?', '...']), 1.2); }
+      }
+    }
+  },
   HELD: {
     go() { eye('dizzy'); rock.bub = null; },
     up(dt) { const f = Math.min(1, dt * 20); rock.x += (ptr.x - rock.x) * f; rock.y += (ptr.y - rock.y) * f; rock.vx = rock.vy = 0; rock.rot = Math.sin(now * 11) * .14 + clamp(ptr.vx * .0004, -.5, .5); }
@@ -383,9 +489,11 @@ const MODES = {
   }
 };
 function event() {
-  const opts = ['NAP', 'SCAN', 'SCAN', 'STARE'];
-  if (rock.mode === 'BUILD' && placedN() > 4) opts.push('RUN', 'RUN', 'RUN');
+  const opts = ['NAP', 'SCAN', 'STARE', 'MINE', 'MINE', 'MINE', 'DECOY', 'DECOY', 'DECOY'];
+  if (rock.mode === 'BUILD' && placedN() > 4) opts.push('RUN', 'RUN');
   const e = pick(opts);
+  if (e === 'MINE') return spawnMines(1 + (Math.random() < .35 ? 1 : 0) + (Math.random() < .15 ? 1 : 0));
+  if (e === 'DECOY') return spawnDecoys(1 + (Math.random() < .45 ? 1 : 0) + (Math.random() < .2 ? 1 : 0));
   if (e !== 'RUN') return setMode(e);
   const p = pick(pieces.filter(q => q.as && q.st === 2)), dx = p.x - cx, dy = p.y - cy, d = hyp(dx, dy) || 1;
   p.st = 0; p.vx = dx / d * 150 + rnd(-40, 40); p.vy = dy / d * 150 + rnd(-40, 40); p.va = rnd(-6, 6); cur = p; stepT = 0;
@@ -400,8 +508,12 @@ function update(dt) {
   MODES[r.mode].up(dt);
   r.x += r.vx * dt; r.y += r.vy * dt;
   if ((r.mode === 'BUILD' || r.mode === 'LOITER') && pauseT <= 0) {
-    evT -= dt; if (evT <= 0) { evT = rnd(24, 48); event(); }
-    idleT -= dt; if (idleT <= 0) { idleT = rnd(28, 50); if (r.mode === 'BUILD' && now - lastSay > 12) say(pick(IDLE)); }
+    if (mines.length) setMode('MINE');
+    else if (decoys.some(q => !q.dead)) setMode('DECOY');
+    else {
+      evT -= dt; if (evT <= 0) { evT = rnd(20, 40); event(); }
+      idleT -= dt; if (idleT <= 0) { idleT = rnd(28, 50); if (r.mode === 'BUILD' && now - lastSay > 12) say(pick(IDLE)); }
+    }
   }
   const sp = hyp(r.vx, r.vy), charging = r.mode === 'WINDUP' && r.ph === 1;
   if (r.mode !== 'HELD' && r.mode !== 'TUMBLE' && !charging && Math.abs(r.vx) > 25) r.face = r.vx > 0 ? 1 : -1;
@@ -443,6 +555,20 @@ function update(dt) {
         if (d < rr && d > .01) { const nx = dx / d, ny = dy / d, rel = (r.vx - p.vx) * nx + (r.vy - p.vy) * ny; p.x = r.x + nx * rr; p.y = r.y + ny * rr; if (rel > 0) { p.vx += nx * rel * 1.2; p.vy += ny * rel * 1.2; p.va += rnd(-3, 3); } }
       }
     }
+  }
+  const VD = clamp(U * .16, 55, 150);
+  for (const m of mines.slice()) {
+    const dx = m.tx - m.x, dy = m.ty - m.y, d = hyp(dx, dy) || 1, v = Math.min(d * .9, VD), f = Math.min(1, dt * 2);
+    m.vx += (dx / d * v - m.vx) * f; m.vy += (dy / d * v - m.vy) * f; m.x += m.vx * dt; m.y += m.vy * dt; m.a += m.va * dt;
+    if (m.fuse > 0) { m.fuse -= dt; if (m.fuse <= 0) { detonate(m, 'chain'); continue; } }
+    if (r.mode !== 'AWAY' && hyp(m.x - r.x, m.y - r.y) < r.R * .8 * r.sc + m.r) detonate(m, r.mode === 'ROCKET' ? 'rocket' : 'rock');
+  }
+  for (let i = decoys.length - 1; i >= 0; i--) {
+    const q = decoys[i];
+    if (q.dead) { q.dt += dt; if (q.dt > .75) decoys.splice(i, 1); continue; }
+    const dx = q.tx - q.x, dy = q.ty - q.y, d = hyp(dx, dy) || 1, v = Math.min(d * .9, VD), f = Math.min(1, dt * 2);
+    q.vx += (dx / d * v - q.vx) * f; q.vy += (dy / d * v - q.vy) * f; q.x += q.vx * dt; q.y += q.vy * dt;
+    if ((r.mode === 'ROCKET' || r.mode === 'TUMBLE') && hyp(q.x - r.x, q.y + 7 * q.k - r.y) < q.w * .4) killDecoy(q, 'rocket');
   }
   for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.l -= dt; if (q.l <= 0) { parts.splice(i, 1); continue; } q.x += q.vx * dt; q.y += q.vy * dt; const f = Math.exp(-2 * dt); q.vx *= f; q.vy *= f; }
   if (parts.length > 260) parts.splice(0, parts.length - 260);
@@ -502,13 +628,53 @@ function drawBubble() {
   else { X.font = 'bold 20px "Chakra Petch",Arial,sans-serif'; X.textAlign = 'center'; X.textBaseline = 'middle'; X.fillText(r.bub, bx + w / 2, by + h / 2 + 1); }
 }
 function drawScan() {
-  if (rock.mode !== 'SCAN' || rock.ph !== 1 || !scanP) return;
-  const r = rock, p = scanP, ox = r.x + r.fx * r.R * .25, oy = r.y, a = Math.atan2(p.y - oy, p.x - ox), d = hyp(p.x - ox, p.y - oy) * 1.15, sw = .2, s = a + Math.sin(now * 7) * sw, b = p.r + 9;
+  let tx, ty, bw, bh, sw = .2, c = 6;
+  if (rock.mode === 'SCAN' && rock.ph === 1 && scanP) { tx = scanP.x; ty = scanP.y; bw = bh = scanP.r + 9; }
+  else if (rock.mode === 'DECOY' && rock.ph === 1 && dcy && !dcy.dead) { tx = dcy.x; ty = dcy.y + 7 * dcy.k; bw = dcy.w * .5 + 6; bh = dcy.h * .5 + 6; c = 12; sw = clamp(Math.atan2(bh * .8, hyp(tx - rock.x, ty - rock.y)), .2, .7); }
+  else return;
+  const r = rock, ox = r.x + r.fx * r.R * .25, oy = r.y, a = Math.atan2(ty - oy, tx - ox), d = hyp(tx - ox, ty - oy) * 1.15, w = a + Math.sin(now * 7) * sw;
   X.save(); X.strokeStyle = '#fff'; X.lineWidth = 1.2; X.setLineDash([3, 5]);
   X.beginPath(); X.moveTo(ox, oy); X.lineTo(ox + Math.cos(a - sw) * d, oy + Math.sin(a - sw) * d); X.moveTo(ox, oy); X.lineTo(ox + Math.cos(a + sw) * d, oy + Math.sin(a + sw) * d); X.stroke();
-  X.setLineDash([]); X.lineWidth = 2; X.beginPath(); X.moveTo(ox, oy); X.lineTo(ox + Math.cos(s) * d, oy + Math.sin(s) * d);
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { X.moveTo(p.x + sx * b, p.y + sy * (b - 6)); X.lineTo(p.x + sx * b, p.y + sy * b); X.lineTo(p.x + sx * (b - 6), p.y + sy * b); }
+  X.setLineDash([]); X.lineWidth = 2; X.beginPath(); X.moveTo(ox, oy); X.lineTo(ox + Math.cos(w) * d, oy + Math.sin(w) * d);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { X.moveTo(tx + sx * bw, ty + sy * (bh - c)); X.lineTo(tx + sx * bw, ty + sy * bh); X.lineTo(tx + sx * (bw - c), ty + sy * bh); }
   X.stroke(); X.restore();
+}
+function mechPath(oy) { for (const pl of MECH) { X.moveTo(pl[0][0], pl[0][1] + oy); for (let i = 1; i < pl.length; i++) X.lineTo(pl[i][0], pl[i][1] + oy); X.closePath(); } }
+function drawDecoy(q) {
+  const bob = Math.sin(now * 1.1 + q.ph) * 3, k = q.k;
+  if (q.dead) {
+    const pr = q.dt / .75;
+    for (let i = 0, y = -40; y < 54; y += 8, i++) {
+      const h1 = Math.abs(Math.sin(i * 12.9898 + q.ph) * 43758.5453) % 1, h2 = Math.abs(Math.sin(i * 78.233 + q.ph) * 12543.123) % 1;
+      if (h1 < pr * .9) continue;
+      X.save(); X.translate(q.x, q.y + bob); X.scale(k * q.flip, k); X.beginPath(); X.rect(-80, y, 160, 8); X.clip();
+      X.translate((h2 - .5) * pr * 70, 0); X.beginPath(); mechPath(0); X.fillStyle = PH; X.fill(); X.restore();
+    }
+  } else if (Math.random() > (q.scan ? .12 : .03)) {
+    const off = (now * (q.scan ? 40 : 12)) % 4, gx = Math.random() < (q.scan ? .25 : .05) ? rnd(-5, 5) : 0;
+    X.save(); X.translate(q.x + gx, q.y + bob); X.scale(k * q.flip, k);
+    X.save(); X.translate(0, off); X.beginPath(); mechPath(-off); X.fillStyle = PH; X.fill(); X.restore();
+    X.beginPath(); mechPath(0); X.strokeStyle = '#fff'; X.lineWidth = 1.2; X.setLineDash([5, 4]); X.lineDashOffset = -now * 14; X.stroke(); X.setLineDash([]); X.lineDashOffset = 0;
+    X.fillStyle = '#fff'; X.fillRect(-5, -31, 10, 2.6);
+    X.lineWidth = 2; X.beginPath(); X.moveTo(-6, -14); X.lineTo(6, -3); X.moveTo(6, -14); X.lineTo(-6, -3); X.stroke();
+    X.restore();
+  }
+  if (q.dead && q.tag !== 'DECOY') return;
+  const ty = q.y - 36 * k - 13 + bob;
+  X.font = '13px "Share Tech Mono",ui-monospace,monospace'; X.textAlign = 'center'; X.textBaseline = 'middle';
+  if (q.tag === 'DECOY') { const tw = X.measureText(q.tag).width + 12; X.fillStyle = '#fff'; X.fillRect(q.x - tw / 2, ty - 9, tw, 18); X.fillStyle = '#000'; }
+  else X.fillStyle = '#fff';
+  X.fillText(q.tag, q.x, ty + 1);
+}
+function drawMine(m) {
+  const hot = m.fuse > 0 || hyp(m.x - rock.x, m.y - rock.y) < rock.R * 4, on = (now * (hot ? 9 : 2.2) + m.ph) % 1 < .5;
+  X.save(); X.translate(m.x, m.y + Math.sin(now * 1.4 + m.ph) * 2); X.rotate(m.a);
+  X.strokeStyle = '#fff'; X.lineWidth = 2.4; X.lineCap = 'round'; X.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; X.moveTo(Math.cos(a) * m.r * .8, Math.sin(a) * m.r * .8); X.lineTo(Math.cos(a) * m.r * 1.5, Math.sin(a) * m.r * 1.5); }
+  X.stroke();
+  X.fillStyle = PD; X.beginPath(); X.arc(0, 0, m.r, 0, TAU); X.fill(); X.lineWidth = 2; X.stroke();
+  X.fillStyle = on ? '#fff' : '#000'; X.beginPath(); X.arc(0, 0, m.r * .38, 0, TAU); X.fill(); X.lineWidth = 1.5; X.stroke();
+  X.restore();
 }
 function draw() {
   X.setTransform(DPR, 0, 0, DPR, 0, 0); X.fillStyle = '#000'; X.fillRect(0, 0, W, H);
@@ -517,6 +683,8 @@ function draw() {
   X.strokeStyle = '#fff'; X.setLineDash([6, 7]);
   for (const q of rings) { X.lineWidth = Math.max(1, q.l * 5); X.beginPath(); X.arc(q.x, q.y, q.r, 0, TAU); X.stroke(); }
   X.setLineDash([]); X.lineJoin = 'round';
+  for (const q of decoys) drawDecoy(q);
+  X.lineJoin = 'round';
   for (const p of pieces) {
     const pr = p.r * (p.st === 2 ? 1.22 + Math.max(0, p.pop) * .5 : 1), fy = p.st === 2 ? Math.sin(now * 1.3 + p.ph) * 1.1 : 0;
     X.save(); X.translate(p.x, p.y + fy); X.rotate(p.a); X.beginPath();
@@ -525,6 +693,7 @@ function draw() {
     if (p.st === 0) { X.lineWidth = 1; X.beginPath(); X.moveTo(p.pts[0][0] * pr * .8, p.pts[0][1] * pr * .8); X.lineTo(0, 0); X.stroke(); }
     X.restore();
   }
+  for (const m of mines) drawMine(m);
   X.fillStyle = '#fff'; for (const q of parts) { const s = q.s * Math.min(1, q.l / q.m * 1.4); X.fillRect(q.x - s / 2, q.y - s / 2, s, s); }
   drawScan();
   if (rock.mode !== 'AWAY') { drawRock(); drawBubble(); }
@@ -580,7 +749,12 @@ C.addEventListener('pointerdown', e => {
   ptr.x = ptr.sx = e.clientX; ptr.y = ptr.sy = e.clientY; ptr.vx = ptr.vy = 0; ptr.moved = false; ptr.lt = performance.now(); ptr.seen = now;
   wakeHud(); wake();
   ptr.grab = grabbable() && hyp(ptr.x - rock.x, ptr.y - rock.y) < rock.R * rock.sc * 1.4 + 12;
-  if (!ptr.grab) pulse(ptr.x, ptr.y);
+  if (ptr.grab) return;
+  const hm = mines.find(m => hyp(m.x - ptr.x, m.y - ptr.y) < m.r * 1.6 + 14);
+  if (hm) return detonate(hm, 'tap');
+  const hd = decoys.find(q => !q.dead && Math.abs(q.x - ptr.x) < q.w * .5 && Math.abs(q.y + 7 * q.k - ptr.y) < q.h * .52);
+  if (hd) return killDecoy(hd, 'tap');
+  pulse(ptr.x, ptr.y);
 });
 C.addEventListener('pointermove', e => {
   const t = performance.now(); ptr.seen = now; wakeHud();
@@ -614,11 +788,13 @@ function toggleSound() {
 function toggleHelp() { helpOpen = !helpOpen; $('help').hidden = !helpOpen; wakeHud(); }
 function smashNow() { if (alive && grabbable() && rock.mode !== 'WINDUP' && rock.mode !== 'HELD' && rock.mode !== 'TUMBLE') { forceHit = true; leaving = false; setMode('WINDUP'); } }
 function skipShape() { if (grabbable() && rock.mode !== 'HELD' && rock.mode !== 'TUMBLE') { rock.sc = 1; eye('open'); newShape(); setMode('BUILD'); } }
+const sendDecoy = () => { spawnDecoys(1 + (Math.random() < .4 ? 1 : 0)); wakeHud(); }, dropMine = () => { spawnMines(1); wakeHud(); };
+$('bDecoy').addEventListener('click', sendDecoy); $('bMine').addEventListener('click', dropMine);
 $('bFull').addEventListener('click', fullScreen); $('bSnd').addEventListener('click', toggleSound); $('bHelp').addEventListener('click', toggleHelp); $('bClose').addEventListener('click', toggleHelp);
 $('help').addEventListener('click', e => { if (e.target === $('help')) toggleHelp(); });
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase(); wakeHud();
-  if (k === ' ') { e.preventDefault(); smashNow(); } else if (k === 'n') skipShape(); else if (k === 'f') fullScreen(); else if (k === 'm') toggleSound(); else if (k === 'h') toggleHelp(); else if (k === 'escape' && helpOpen) toggleHelp();
+  if (k === ' ') { e.preventDefault(); smashNow(); } else if (k === 'n') skipShape(); else if (k === 'd') sendDecoy(); else if (k === 'x') dropMine(); else if (k === 'f') fullScreen(); else if (k === 'm') toggleSound(); else if (k === 'h') toggleHelp(); else if (k === 'escape' && helpOpen) toggleHelp();
 });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
 addEventListener('resize', resize); addEventListener('orientationchange', () => setTimeout(resize, 250));
@@ -630,10 +806,10 @@ function frame(ts) {
   if (document.hidden) { last = ts; return; }
   const el = ts - last; if (el < 14) return; last = ts;
   try { update(Math.min(el / 1000, .05)); draw(); }
-  catch (e) { if (errs++ < 3) console.error(e); for (const p of pieces) { p.as = false; p.st = 0; } alive = false; cur = null; scanP = null; rock.sc = 1; rock.rot = 0; rock.mode = 'LOITER'; rock.t = 0; rock.ph = 2; }
+  catch (e) { if (errs++ < 3) console.error(e); for (const p of pieces) { p.as = false; p.st = 0; } alive = false; cur = null; scanP = null; mineT = null; dcy = null; rock.sc = 1; rock.rot = 0; rock.mode = 'LOITER'; rock.t = 0; rock.ph = 2; }
 }
 resize(); rock.y = H * .5; rock.x = -rock.R * 3; setMode('ENTER'); save(); say('R.O.C.K. IDLER v' + VERSION + ' online.'); wakeHud(); wake();
-if (location.hash === '#debug') window.ROCK = { rock, pieces, stats, smashNow, skipShape, event, setMode, get shape() { return shape && shape.n; }, get alive() { return alive; }, get now() { return now; } };
+if (location.hash === '#debug') window.ROCK = { rock, pieces, stats, smashNow, skipShape, event, setMode, spawnMines, spawnDecoys, show(n) { newShape(n); for (const p of pieces) if (p.as) { p.x = p.tx; p.y = p.ty; p.vx = p.vy = 0; p.st = 2; } setMode('BUILD'); }, get mines() { return mines; }, get decoys() { return decoys; }, get shape() { return shape && shape.n; }, get alive() { return alive; }, get now() { return now; } };
 requestAnimationFrame(frame);
 }
 </script>
